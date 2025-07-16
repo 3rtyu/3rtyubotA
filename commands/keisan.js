@@ -16,6 +16,7 @@ function randInt() {
 
 /**
  * 計算問題と正解を生成する
+ * 掛け算を先に、足し算・引き算はその後に計算します
  * @returns {{ question: string, answer: number }}
  */
 function generateProblem() {
@@ -25,18 +26,30 @@ function generateProblem() {
   const ops = ['+', '-', '*'];
   const op1 = ops[Math.floor(Math.random() * ops.length)];
   const op2 = ops[Math.floor(Math.random() * ops.length)];
+
+  // 見た目用に × を使う
   const symbolMap = { '+': '+', '-': '-', '*': '×' };
   const question = `${a} ${symbolMap[op1]} ${b} ${symbolMap[op2]} ${c}`;
 
-  let interim;
-  if (op1 === '*') interim = a * b;
-  else if (op1 === '+') interim = a + b;
-  else interim = a - b;
-
   let answer;
-  if (op2 === '*') answer = interim * c;
-  else if (op2 === '+') answer = interim + c;
-  else answer = interim - c;
+  // op2 が掛け算かつ op1 が加減の場合 => a ± (b * c)
+  if (op2 === '*' && (op1 === '+' || op1 === '-')) {
+    const mult = b * c;
+    answer = op1 === '+' ? a + mult : a - mult;
+
+  // それ以外は左から順に計算
+  } else {
+    // まず op1
+    let interim;
+    if (op1 === '*') interim = a * b;
+    else if (op1 === '+') interim = a + b;
+    else interim = a - b;
+
+    // 次に op2
+    if (op2 === '*') answer = interim * c;
+    else if (op2 === '+') answer = interim + c;
+    else answer = interim - c;
+  }
 
   return { question, answer };
 }
