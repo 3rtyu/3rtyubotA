@@ -76,11 +76,11 @@ function disableAll(rows) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('keisan')
-    .setDescription('計算早押しチャレンジ（罰ゲーム付き）')
+    .setDescription('計算早押しチャレンジ')
     .addSubcommandGroup(group =>
       group
         .setName('batsu')
-        .setDescription('罰ゲーム付きの早押しを開始')
+        .setDescription('早押しを開始')
         .addSubcommand(sub =>
           sub.setName('start').setDescription('ゲームを開始する')
         )
@@ -127,9 +127,9 @@ module.exports = {
     // 出題
     const quizMsg = await interaction.reply({
       content:
-        '🧮 罰ゲーム付き 計算早押しチャレンジ（三択）！\n' +
+        '🧮 計算早押しチャレンジ（三択）！\n' +
         `問題: **${question}** = ?\n` +
-        '正解すればセーフ、外すと罰ゲーム！(5分 or 先着5回答)',
+        '5分 or 誰かが正解したら終了',
       components: [choiceRow],
       fetchReply: true
     });
@@ -149,14 +149,14 @@ module.exports = {
       const picked = Number(btnInt.customId.split('_').pop());
       if (picked === answer) {
         await btnInt.update({
-          content: `🎉 正解！ ${btnInt.user} さんはセーフです！`,
+          content: `🎉 ${btnInt.user} さん正解！`,
           components: disableAll(quizMsg.components)
         });
         collector.stop('correct');
       } else {
         wrongRespondents.add(userId);
         await btnInt.reply({
-          content: `❌ 外れ！ ${btnInt.user} さんは罰ゲーム対象です。`,
+          content: `❌ ${btnInt.user} さん外れ！`,
           ephemeral: false
         });
         if (respondents.size >= 5) collector.stop('limit');
