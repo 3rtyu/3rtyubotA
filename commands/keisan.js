@@ -26,26 +26,19 @@ function generateProblem() {
   const ops = ['+', '-', '*'];
   const op1 = ops[Math.floor(Math.random() * ops.length)];
   const op2 = ops[Math.floor(Math.random() * ops.length)];
-
-  // 見た目用に × を使う
   const symbolMap = { '+': '+', '-': '-', '*': '×' };
   const question = `${a} ${symbolMap[op1]} ${b} ${symbolMap[op2]} ${c}`;
 
   let answer;
-  // op2 が掛け算かつ op1 が加減の場合 => a ± (b * c)
   if (op2 === '*' && (op1 === '+' || op1 === '-')) {
     const mult = b * c;
     answer = op1 === '+' ? a + mult : a - mult;
-
-  // それ以外は左から順に計算
   } else {
-    // まず op1
     let interim;
     if (op1 === '*') interim = a * b;
     else if (op1 === '+') interim = a + b;
     else interim = a - b;
 
-    // 次に op2
     if (op2 === '*') answer = interim * c;
     else if (op2 === '+') answer = interim + c;
     else answer = interim - c;
@@ -60,13 +53,13 @@ function generateProblem() {
  * @returns {number[]}
  */
 function makeChoices(correct) {
-  const choices = new Set([correct]);
-  while (choices.size < 3) {
+  const set = new Set([correct]);
+  while (set.size < 3) {
     const delta = Math.floor(Math.random() * 11) - 5; // -5〜+5
     const wrong = correct + (delta === 0 ? 1 : delta);
-    if (wrong >= 0) choices.add(wrong);
+    if (wrong >= 0) set.add(wrong);
   }
-  return Array.from(choices).sort(() => Math.random() - 0.5);
+  return Array.from(set).sort(() => Math.random() - 0.5);
 }
 
 /**
@@ -103,11 +96,13 @@ module.exports = {
     }
     games.set(channelId, true);
 
-    // 問題と選択肢を生成
     const { question, answer } = generateProblem();
     const choices = makeChoices(answer);
 
-    // 選択肢ボタン
+    // 回答トラッカー
+    const respondents = new Set();
+    const wrongRespondents = new Set();
+
     const choiceRow = new ActionRowBuilder().addComponents(
       choices.map(num =>
         new ButtonBuilder()
@@ -117,7 +112,6 @@ module.exports = {
       )
     );
 
-    // 出題メッセージ
     const quizMsg = await interaction.reply({
       content:
         '🧮 計算早押しチャレンジ（三択）！\n' +
@@ -127,10 +121,6 @@ module.exports = {
       fetchReply: true
     });
 
-    // ユニーク回答者をカウント
-    const respondents = new Set();
-
-    // 回答ボタン収集器
     const collector = quizMsg.createMessageComponentCollector({
       componentType: ComponentType.Button,
       time: 5 * 60 * 1000 // 5分
@@ -138,23 +128,24 @@ module.exports = {
 
     collector.on('collect', async btnInt => {
       const userId = btnInt.user.id;
+      if (respondents.has(userId)) {
+        return btnInt.reply({ content: 'あなたはすでに回答しました。', ephemeral: true });
+      }
       respondents.add(userId);
 
       const picked = Number(btnInt.customId.split('_').pop());
       if (picked === answer) {
-        // 正解者が出たらすぐ終了
         await btnInt.update({
           content: `🎉 正解！ ${btnInt.user} さんが **${answer}** を当てました！`,
           components: disableAll(quizMsg.components)
         });
         collector.stop('correct');
       } else {
-        // 誤答
+        wrongRespondents.add(userId);
         await btnInt.reply({
           content: `❌ 残念！ ${picked} は違います。`,
           ephemeral: true
         });
-        // 5人が回答(誤答含む)したら終了
         if (respondents.size >= 5) {
           collector.stop('limit');
         }
@@ -162,19 +153,22 @@ module.exports = {
     });
 
     collector.on('end', async (_, reason) => {
-      // 正解時はすでに処理済み
       if (reason === 'correct') {
         games.delete(channelId);
         return;
       }
 
-      // 期限切れ or 5回答到達時に答えを発表
+      const wrongList = Array.from(wrongRespondents)
+        .map(id => `<@${id}>`)
+        .join(' ') || 'なし';
+
       await quizMsg.edit({
         content:
           (reason === 'limit'
             ? '⌛ 先着5回答に達しました！\n'
             : '⌛ 制限時間終了！\n') +
-          `答えは **${answer}** でした。`,
+          `答えは **${answer}** でした。\n` +
+          `不正解者: ${wrongList}`,
         components: disableAll(quizMsg.components)
       });
 
