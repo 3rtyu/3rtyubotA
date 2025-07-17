@@ -15,8 +15,7 @@ function randInt() {
 }
 
 /**
- * 計算問題と正解を生成する
- * 掛け算を先に、足し算・引き算はその後に計算します
+ * 計算問題と正解を生成する（掛け算を優先）
  * @returns {{ question: string, answer: number }}
  */
 function generateProblem() {
@@ -48,24 +47,21 @@ function generateProblem() {
 }
 
 /**
- * 正解とダミー選択肢を組み合わせてシャッフルして返す
+ * 正解とダミーをシャッフルして返す
  * @param {number} correct
  * @returns {number[]}
  */
 function makeChoices(correct) {
   const set = new Set([correct]);
   while (set.size < 3) {
-    const delta = Math.floor(Math.random() * 11) - 5; // -5〜+5
+    const delta = Math.floor(Math.random() * 11) - 5;
     const wrong = correct + (delta === 0 ? 1 : delta);
     if (wrong >= 0) set.add(wrong);
   }
   return Array.from(set).sort(() => Math.random() - 0.5);
 }
 
-/**
- * ActionRowBuilder[] を受け取り、全てのボタンを無効化して返す
- * @param {ActionRowBuilder[]} rows
- */
+/** ボタンを全て無効化する */
 function disableAll(rows) {
   return rows.map(row => {
     const r = ActionRowBuilder.from(row);
@@ -81,9 +77,7 @@ module.exports = {
     .setName('keisan')
     .setDescription('5分の制限時間で三択計算早押しを開始します')
     .addSubcommand(sub =>
-      sub
-        .setName('start')
-        .setDescription('ゲームを開始する')
+      sub.setName('start').setDescription('ゲームを開始する')
     ),
 
   async execute(client, interaction) {
@@ -94,12 +88,12 @@ module.exports = {
         ephemeral: true
       });
     }
+
     games.set(channelId, true);
 
     const { question, answer } = generateProblem();
     const choices = makeChoices(answer);
 
-    // 回答トラッカー
     const respondents = new Set();
     const wrongRespondents = new Set();
 
@@ -123,17 +117,21 @@ module.exports = {
 
     const collector = quizMsg.createMessageComponentCollector({
       componentType: ComponentType.Button,
-      time: 5 * 60 * 1000 // 5分
+      time: 5 * 60 * 1000
     });
 
     collector.on('collect', async btnInt => {
       const userId = btnInt.user.id;
       if (respondents.has(userId)) {
-        return btnInt.reply({ content: 'あなたはすでに回答しました。', ephemeral: true });
+        return btnInt.reply({
+          content: 'すでに回答しています。',
+          ephemeral: true
+        });
       }
-      respondents.add(userId);
 
+      respondents.add(userId);
       const picked = Number(btnInt.customId.split('_').pop());
+
       if (picked === answer) {
         await btnInt.update({
           content: `🎉 正解！ ${btnInt.user} さんが **${answer}** を当てました！`,
@@ -153,22 +151,23 @@ module.exports = {
     });
 
     collector.on('end', async (_, reason) => {
-      if (reason === 'correct') {
-        games.delete(channelId);
-        return;
-      }
-
       const wrongList = Array.from(wrongRespondents)
         .map(id => `<@${id}>`)
         .join(' ') || 'なし';
 
+      let resultMsg = '';
+      if (reason === 'correct') {
+        resultMsg = `🎉 正解者が出ました！\n答えは **${answer}** でした。\n`;
+      } else if (reason === 'limit') {
+        resultMsg = `⌛ 先着5回答に達しました！\n答えは **${answer}** でした。\n`;
+      } else {
+        resultMsg = `⌛ 制限時間終了！\n答えは **${answer}** でした。\n`;
+      }
+
+      resultMsg += `不正解者: ${wrongList}`;
+
       await quizMsg.edit({
-        content:
-          (reason === 'limit'
-            ? '⌛ 先着5回答に達しました！\n'
-            : '⌛ 制限時間終了！\n') +
-          `答えは **${answer}** でした。\n` +
-          `不正解者: ${wrongList}`,
+        content: resultMsg,
         components: disableAll(quizMsg.components)
       });
 
