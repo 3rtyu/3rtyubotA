@@ -12,13 +12,13 @@ const gameStates = new Map();
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('kurohige')
-    .setDescription('黒ひげ危機一髪ゲーム（地雷6つから選ぶドキドキミニゲーム）'),
+    .setDescription('黒ひげ危機一髪ゲームを開始します！）'),
 
   async execute(client, interaction) {
     const channelId = interaction.channelId;
     if (gameStates.has(channelId)) {
       return interaction.reply({
-        content: 'このチャンネルではすでに黒ひげゲームが進行中です。',
+        content: 'このチャンネルでは既に黒ひげゲームが進行中です。',
         ephemeral: true
       });
     }
@@ -28,7 +28,7 @@ module.exports = {
       players: [interaction.user.id],
       status: 'recruiting',
       usedNumbers: new Set(),
-      bombNumber: Math.floor(Math.random() * 6) + 1 // 地雷番号 1〜6
+      bombNumber: Math.floor(Math.random() * 5) + 1 // 地雷番号 1〜5
     };
     gameStates.set(channelId, game);
 
@@ -79,7 +79,7 @@ module.exports = {
       await joinMsg.edit({
         content:
           `🎮 募集終了！参加者: ${players.map(id => `<@${id}>`).join(' ')}\n` +
-          '地雷番号が1〜6のうち1つ決まりました！順番に数字を選んでください。\n' +
+          '地雷番号が1〜5のうち1つ決まりました！順番に数字を選んでください。\n' +
           `🎯 最初のターン: <@${game.turnOrder[0]}>（3分以内に選択）`,
         components: [makeNumberButtons(game.usedNumbers)]
       });
@@ -91,7 +91,7 @@ module.exports = {
 
 function makeNumberButtons(usedSet) {
   const row = new ActionRowBuilder();
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 5; i++) {
     row.addComponents(
       new ButtonBuilder()
         .setCustomId(`kurohige_pick_${i}`)
@@ -117,7 +117,7 @@ function startTurn(msg, game) {
     const selected = Number(btn.customId.split('_').pop());
 
     if (uid !== currentPlayer) {
-      return btn.reply({ content: '今はあなたのターンではありません！', ephemeral: true });
+      return btn.reply({ content: '今はあなたのターンではありません。', ephemeral: true });
     }
 
     if (game.usedNumbers.has(selected)) {
