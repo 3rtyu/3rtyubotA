@@ -77,7 +77,7 @@ function disableAll(rows) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('keisan')
-    .setDescription('3分間の三択計算クイズを開始／停止します')
+    .setDescription('3択計算クイズを開始します！')
     .addSubcommand(sub =>
       sub.setName('start').setDescription('ゲームを開始する')
     )
