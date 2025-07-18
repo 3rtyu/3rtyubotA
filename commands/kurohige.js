@@ -7,7 +7,7 @@ const emojiToNumber = {
   '6️⃣': 6, '7️⃣': 7, '8️⃣': 8, '9️⃣': 9, '🔟': 10
 };
 
-const games = new Map(); // channelId → game object
+const games = new Map(); // チャンネルID → ゲームオブジェクト
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -20,7 +20,6 @@ module.exports = {
       return interaction.reply({ content: 'このチャンネルでは既にゲームが進行中です。', ephemeral: true });
     }
 
-    // 初期ゲーム状態
     const game = {
       status: 'recruiting',
       players: [interaction.user.id],
@@ -34,9 +33,8 @@ module.exports = {
       fetchReply: true
     });
 
-    await joinMsg.react('🖐️'); // 参加用リアクション
+    await joinMsg.react('🖐️');
 
-    // 参加者収集（🖐️）を30秒受け付け
     const joinCollector = joinMsg.createReactionCollector({
       filter: (r, u) => !u.bot && r.emoji.name === '🖐️',
       time: 30_000
@@ -55,7 +53,6 @@ module.exports = {
         return;
       }
 
-      // ゲーム開始
       game.status = 'playing';
       game.order = [...game.players].sort(() => Math.random() - 0.5);
       game.turn = 0;
@@ -95,31 +92,32 @@ async function startTurn(msg, game, channelId) {
     }
 
     if (uid !== currentId) {
-      await reaction.users.remove(uid); // ターン外ユーザーのリアクション削除
+      await reaction.users.remove(uid);
       return;
     }
 
     game.used.add(number);
 
     if (number === game.bomb) {
-      await msg.channel.send(`💥 <@${uid}> が ${emoji} を選んで爆発！地雷でした…`);
+      await msg.channel.send(`**💥 <@${uid}> が ${emoji} を選んで爆発！地雷でした…**`);
       games.delete(channelId);
-      collector.stop();
+      collector.stop('bomb');
     } else {
-      await msg.channel.send(`✅ <@${uid}> が ${emoji} を選択 → セーフ！`);
+      const safeMsg = await msg.channel.send(`✅ <@${uid}> が ${emoji} を選択 → セーフ！`);
       game.turn = (game.turn + 1) % game.order.length;
       const nextId = game.order[game.turn];
+      await safeMsg.delete();
       await msg.channel.send(`🕹️ 次のターン: <@${nextId}>（3分以内にリアクションを押してください）`);
-      collector.stop();
+      collector.stop('userStop');
       await startTurn(msg, game, channelId);
     }
   });
 
   collector.on('end', async (_, reason) => {
     if (!games.has(channelId)) return;
-    if (reason !== 'messageDelete' && reason !== 'userStop') {
-      await msg.channel.send(`⏱ <@${currentId}> が時間切れ！ゲーム終了。`);
-      games.delete(channelId);
-    }
+    if (['userStop', 'bomb', 'messageDelete'].includes(reason)) return;
+
+    await msg.channel.send(`⏱ <@${currentId}> が時間切れ！ゲーム終了。`);
+    games.delete(channelId);
   });
 }
