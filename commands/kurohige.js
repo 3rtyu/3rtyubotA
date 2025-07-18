@@ -26,13 +26,14 @@ module.exports = {
       bomb: Math.floor(Math.random() * 10) + 1,
       used: new Set(),
       lastSafeMsg: null,
+      lastNextTurnMsg: null,
       playMsg: null
     };
     games.set(channelId, game);
 
     const joinMsg = await interaction.reply({
       content: `${interaction.user} さんが黒ひげ危機一髪風ゲームを開始！
-      参加したい人は30秒以内に手のリアクションを選択してください。`,
+参加したい人は30秒以内に手のリアクションを選択してください。`,
       fetchReply: true
     });
 
@@ -62,7 +63,7 @@ module.exports = {
 
       const playMsg = await interaction.channel.send({
         content:
-          `🎯 地雷番号（1〜10）が設定されました！リアクションで数字を選択しましょう！\n` +
+          `🎯 地雷のリアクションに反応しないように選択しましょう！\n` +
           `順番: ${game.order.map(id => `<@${id}>`).join(' → ')}\n` +
           `最初のターン: <@${game.order[0]}>（3分以内にリアクションを押してください）`
       });
@@ -79,16 +80,6 @@ module.exports = {
 };
 
 async function startTurn(msg, game, channelId) {
-  // 前のターンのセーフメッセージ削除
-  if (game.lastSafeMsg) {
-    try {
-      await game.lastSafeMsg.delete();
-    } catch (err) {
-      console.error('セーフメッセージの削除失敗:', err);
-    }
-    game.lastSafeMsg = null;
-  }
-
   const currentId = game.order[game.turn];
 
   const collector = msg.createReactionCollector({
@@ -113,14 +104,21 @@ async function startTurn(msg, game, channelId) {
 
     game.used.add(number);
 
-    // 使用済みリアクションを削除（全員から）
     try {
       const reactionToRemove = msg.reactions.cache.get(emoji);
-      if (reactionToRemove) {
-        await reactionToRemove.remove();
-      }
+      if (reactionToRemove) await reactionToRemove.remove();
     } catch (err) {
       console.error('リアクション削除失敗:', err);
+    }
+
+    // 前ターンのセーフ・次ターンメッセージ削除
+    if (game.lastSafeMsg) {
+      try { await game.lastSafeMsg.delete(); } catch (e) {}
+      game.lastSafeMsg = null;
+    }
+    if (game.lastNextTurnMsg) {
+      try { await game.lastNextTurnMsg.delete(); } catch (e) {}
+      game.lastNextTurnMsg = null;
     }
 
     if (number === game.bomb) {
@@ -134,7 +132,9 @@ async function startTurn(msg, game, channelId) {
       game.turn = (game.turn + 1) % game.order.length;
       const nextId = game.order[game.turn];
 
-      await msg.channel.send(`🕹️ 次のターン: <@${nextId}>（3分以内にリアクションを押してください）`);
+      const nextMsg = await msg.channel.send(`🕹️ 次のターン: <@${nextId}>（3分以内にリアクションを押してください）`);
+      game.lastNextTurnMsg = nextMsg;
+
       collector.stop('userStop');
       await startTurn(msg, game, channelId);
     }
