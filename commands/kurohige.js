@@ -7,24 +7,24 @@ const {
   ComponentType
 } = require('discord.js');
 
-const gameStates = new Map(); // チャンネルID → ゲーム状態
+const gameStates = new Map();
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('kurohige')
-    .setDescription('黒ひげ危機一髪風ミニゲームを開始します'),
+    .setDescription('黒ひげ危機一髪ゲームを開始します'),
 
   async execute(client, interaction) {
     const channelId = interaction.channelId;
     if (gameStates.has(channelId)) {
       return interaction.reply({
-        content: 'このチャンネルではすでに黒ひげゲームが進行中です。',
+        content: 'このチャンネルではゲームが進行中です。',
         ephemeral: true
       });
     }
 
-    // ゲーム初期化
     const game = {
+      initiator: interaction.user.id,
       players: [interaction.user.id],
       status: 'recruiting',
       usedNumbers: new Set(),
@@ -32,7 +32,6 @@ module.exports = {
     };
     gameStates.set(channelId, game);
 
-    // 参加ボタン
     const joinRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('kurohige_join')
@@ -42,13 +41,12 @@ module.exports = {
 
     const joinMsg = await interaction.reply({
       content:
-        `${interaction.user} さんが黒ひげゲームを開始しました！\n` +
-        '30秒間「参加する」ボタンで参加できます！',
+        `${interaction.user} さんが黒ひげ危機一髪ゲームを開始しました！\n` +
+        '30秒間参加可能です。「参加する」ボタンを押して参加してください。',
       components: [joinRow],
       fetchReply: true
     });
 
-    // 参加収集器（30秒）
     const joinCollector = joinMsg.createMessageComponentCollector({
       componentType: ComponentType.Button,
       time: 30_000
@@ -57,16 +55,17 @@ module.exports = {
     joinCollector.on('collect', async btn => {
       const uid = btn.user.id;
       if (game.players.includes(uid)) {
-        return btn.reply({ content: 'すでに参加しています。', ephemeral: true });
+        return btn.reply({ content: '既に参加しています。', ephemeral: true });
       }
       game.players.push(uid);
-      await btn.reply({ content: '参加登録しました！', ephemeral: true });
+      await btn.reply({ content: '参加しました！', ephemeral: true });
     });
 
     joinCollector.on('end', async () => {
-      if (game.players.length < 2) {
+      const players = game.players;
+      if (!players || players.length < 2) {
         await joinMsg.edit({
-          content: '参加者が2名未満だったため、ゲームを中止します。',
+          content: '参加者が2名未満だったため、ゲームは中止されました。',
           components: []
         });
         gameStates.delete(channelId);
@@ -74,24 +73,22 @@ module.exports = {
       }
 
       game.status = 'playing';
-      game.turnOrder = [...game.players].sort(() => Math.random() - 0.5);
+      game.turnOrder = [...players].sort(() => Math.random() - 0.5);
       game.turnIndex = 0;
 
       await joinMsg.edit({
         content:
-          `💣 地雷番号（1〜10）が設定されました！\n` +
-          `順番に数字ボタンを選びましょう。\n` +
-          `地雷を押したら…爆発！\n\n` +
-          `🌟 最初のターン: <@${game.turnOrder[0]}>（3分以内に選択してください）`,
+          `🎮 募集終了！参加者: ${players.map(id => `<@${id}>`).join(' ')}\n` +
+          '地雷番号が1〜10のうち1つ決まりました！順番に数字を選んでください。\n' +
+          `🎯 最初のターン: <@${game.turnOrder[0]}>（3分以内に選択）`,
         components: [makeNumberButtons(game.usedNumbers)]
       });
 
-      startTurn(joinMsg, game);
+      await startTurn(joinMsg, gameStates.get(channelId));
     });
   }
 };
 
-/** 数字ボタン生成（使用済みは無効化） */
 function makeNumberButtons(usedSet) {
   const row = new ActionRowBuilder();
   for (let i = 1; i <= 10; i++) {
@@ -106,65 +103,59 @@ function makeNumberButtons(usedSet) {
   return row;
 }
 
-/** ターンを進める（個人ごとに3分の制限時間） */
 function startTurn(msg, game) {
   const channelId = msg.channel.id;
-  const currentPlayerId = game.turnOrder[game.turnIndex];
+  const currentPlayer = game.turnOrder[game.turnIndex];
 
-  const turnCollector = msg.createMessageComponentCollector({
+  const collector = msg.createMessageComponentCollector({
     componentType: ComponentType.Button,
     time: 3 * 60 * 1000 // 3分
   });
 
-  turnCollector.on('collect', async btn => {
-    const selected = Number(btn.customId.split('_').pop());
+  collector.on('collect', async btn => {
     const uid = btn.user.id;
+    const selected = Number(btn.customId.split('_').pop());
 
-    if (uid !== currentPlayerId) {
-      return btn.reply({ content: 'あなたのターンではありません。', ephemeral: true });
+    if (uid !== currentPlayer) {
+      return btn.reply({ content: '今はあなたのターンではありません！', ephemeral: true });
     }
+
     if (game.usedNumbers.has(selected)) {
-      return btn.reply({ content: 'この番号はすでに選ばれています。', ephemeral: true });
+      return btn.reply({ content: 'その番号はすでに選ばれています。', ephemeral: true });
     }
 
     game.usedNumbers.add(selected);
 
     if (selected === game.bombNumber) {
-      await btn.reply(`💥 ${selected} を選んで爆発！<@${uid}> の負けです…`);
-      msg.edit({
+      await btn.reply(`💥 ${selected} を選んで爆発！<@${uid}> の負けです！`);
+      await msg.edit({
         content:
-          `💣 地雷は **${selected}** でした！\n` +
-          `爆発したのは <@${uid}> さんです！`,
+          `💣 地雷は **${selected}** でした！\n爆発したのは <@${uid}> さんです！`,
         components: []
       });
-      turnCollector.stop('exploded');
+      collector.stop('end');
       gameStates.delete(channelId);
     } else {
-      await btn.reply(`✅ ${selected} はセーフです！`);
-
-      // 次のプレイヤーへ
+      await btn.reply(`✅ ${selected} はセーフ！`);
       game.turnIndex = (game.turnIndex + 1) % game.turnOrder.length;
       const nextPlayer = game.turnOrder[game.turnIndex];
 
-      msg.edit({
+      await msg.edit({
         content:
-          `✅ <@${uid}> が ${selected} を選択 → セーフ！\n` +
+          `✅ <@${uid}> が ${selected} を選びました → セーフ！\n` +
           `次のターン: <@${nextPlayer}>（3分以内に選択してください）`,
         components: [makeNumberButtons(game.usedNumbers)]
       });
 
-      turnCollector.stop('safe');
-      startTurn(msg, game);
+      collector.stop('continue');
+      startTurn(msg, gameStates.get(channelId));
     }
   });
 
-  turnCollector.on('end', async (_, reason) => {
-    if (reason === 'exploded' || reason === 'safe') return;
-
-    // ターン時間切れ
+  collector.on('end', async (_, reason) => {
+    if (reason === 'end' || reason === 'continue') return;
     await msg.edit({
-      content:
-        `⏱ <@${currentPlayerId}> が3分以内に選択しなかったため、ゲームは終了しました。`,
+      content: `⏱ <@${currentPlayer}> が時間切れ（3分）となったため、ゲームは終了しました。`,
       components: []
     });
     gameStates.delete(channelId);
