@@ -24,12 +24,15 @@ module.exports = {
       status: 'recruiting',
       players: [interaction.user.id],
       bomb: Math.floor(Math.random() * 10) + 1,
-      used: new Set()
+      used: new Set(),
+      lastSafeMsg: null,
+      playMsg: null
     };
     games.set(channelId, game);
 
     const joinMsg = await interaction.reply({
-      content: `${interaction.user} さんが黒ひげリアクションゲームを開始！参加したい人は30秒以内に「参加」リアクションをしてください。`,
+      content: `${interaction.user} さんが黒ひげ危機一髪風ゲームを開始！
+      参加したい人は30秒以内に手のリアクションを選択してください。`,
       fetchReply: true
     });
 
@@ -64,6 +67,8 @@ module.exports = {
           `最初のターン: <@${game.order[0]}>（3分以内にリアクションを押してください）`
       });
 
+      game.playMsg = playMsg;
+
       for (const emoji of numberEmojis) {
         await playMsg.react(emoji);
       }
@@ -74,6 +79,16 @@ module.exports = {
 };
 
 async function startTurn(msg, game, channelId) {
+  // 前のターンのセーフメッセージ削除
+  if (game.lastSafeMsg) {
+    try {
+      await game.lastSafeMsg.delete();
+    } catch (err) {
+      console.error('セーフメッセージの削除失敗:', err);
+    }
+    game.lastSafeMsg = null;
+  }
+
   const currentId = game.order[game.turn];
 
   const collector = msg.createReactionCollector({
@@ -98,15 +113,27 @@ async function startTurn(msg, game, channelId) {
 
     game.used.add(number);
 
+    // 使用済みリアクションを削除（全員から）
+    try {
+      const reactionToRemove = msg.reactions.cache.get(emoji);
+      if (reactionToRemove) {
+        await reactionToRemove.remove();
+      }
+    } catch (err) {
+      console.error('リアクション削除失敗:', err);
+    }
+
     if (number === game.bomb) {
       await msg.channel.send(`**💥 <@${uid}> が ${emoji} を選んで爆発！地雷でした…**`);
       games.delete(channelId);
       collector.stop('bomb');
     } else {
       const safeMsg = await msg.channel.send(`✅ <@${uid}> が ${emoji} を選択 → セーフ！`);
+      game.lastSafeMsg = safeMsg;
+
       game.turn = (game.turn + 1) % game.order.length;
       const nextId = game.order[game.turn];
-      await safeMsg.delete();
+
       await msg.channel.send(`🕹️ 次のターン: <@${nextId}>（3分以内にリアクションを押してください）`);
       collector.stop('userStop');
       await startTurn(msg, game, channelId);
