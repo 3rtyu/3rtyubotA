@@ -1,163 +1,136 @@
-// commands/kurohige.js
-const {
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType
-} = require('discord.js');
+// commands/kurohige_reaction.js
+const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 
-const gameStates = new Map();
+const numberEmojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+const emojiToNumber = {
+  '1️⃣': 1, '2️⃣': 2, '3️⃣': 3, '4️⃣': 4, '5️⃣': 5,
+  '6️⃣': 6, '7️⃣': 7, '8️⃣': 8, '9️⃣': 9, '🔟': 10
+};
+
+const games = new Map();
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('kurohige')
-    .setDescription('黒ひげ危機一髪ゲームを開始します！）'),
+    .setDescription('黒ひげ風ゲームを開始します！'),
 
   async execute(client, interaction) {
     const channelId = interaction.channelId;
-    if (gameStates.has(channelId)) {
-      return interaction.reply({
-        content: 'このチャンネルでは既に黒ひげゲームが進行中です。',
-        ephemeral: true
-      });
+    if (games.has(channelId)) {
+      return interaction.reply({ content: 'このチャンネルでは既にゲームが進行中です。', ephemeral: true });
     }
 
     const game = {
-      initiator: interaction.user.id,
-      players: [interaction.user.id],
       status: 'recruiting',
-      usedNumbers: new Set(),
-      bombNumber: Math.floor(Math.random() * 5) + 1 // 地雷番号 1〜5
+      players: [interaction.user.id],
+      bomb: Math.floor(Math.random() * 10) + 1,
+      used: new Set()
     };
-    gameStates.set(channelId, game);
+    games.set(channelId, game);
 
     const joinRow = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
-        .setCustomId('kurohige_join')
+        .setCustomId('join')
         .setLabel('参加する')
         .setStyle(ButtonStyle.Primary)
     );
 
     const joinMsg = await interaction.reply({
-      content:
-        `${interaction.user} さんが黒ひげ危機一髪ゲームを開始しました！\n` +
-        '30秒間参加可能です。「参加する」ボタンを押して参加してください。',
+      content: `${interaction.user} さんが黒ひげゲームを開始しました！\n30秒間「参加する」ボタンで参加してください。`,
       components: [joinRow],
       fetchReply: true
     });
 
-    const joinCollector = joinMsg.createMessageComponentCollector({
-      componentType: ComponentType.Button,
+    const collector = joinMsg.createMessageComponentCollector({
+      componentType: 2,
       time: 30_000
     });
 
-    joinCollector.on('collect', async btn => {
+    collector.on('collect', async btn => {
       const uid = btn.user.id;
-      if (game.players.includes(uid)) {
-        return btn.reply({ content: '既に参加しています。', ephemeral: true });
+      if (!game.players.includes(uid)) {
+        game.players.push(uid);
+        await btn.reply({ content: '参加しました！', ephemeral: true });
+      } else {
+        await btn.reply({ content: '既に参加しています。', ephemeral: true });
       }
-      game.players.push(uid);
-      await btn.reply({ content: '参加しました！', ephemeral: true });
     });
 
-    joinCollector.on('end', async () => {
-      const players = game.players;
-      if (!players || players.length < 2) {
+    collector.on('end', async () => {
+      if (game.players.length < 2) {
         await joinMsg.edit({
           content: '参加者が2名未満だったため、ゲームは中止されました。',
           components: []
         });
-        gameStates.delete(channelId);
+        games.delete(channelId);
         return;
       }
 
       game.status = 'playing';
-      game.turnOrder = [...players].sort(() => Math.random() - 0.5);
-      game.turnIndex = 0;
+      game.order = [...game.players].sort(() => Math.random() - 0.5);
+      game.turn = 0;
 
-      await joinMsg.edit({
+      const playMsg = await interaction.channel.send({
         content:
-          `🎮 募集終了！参加者: ${players.map(id => `<@${id}>`).join(' ')}\n` +
-          '地雷番号が1〜5のうち1つ決まりました！順番に数字を選んでください。\n' +
-          `🎯 最初のターン: <@${game.turnOrder[0]}>（3分以内に選択）`,
-        components: [makeNumberButtons(game.usedNumbers)]
+          `🎮 募集終了！順番: ${game.order.map(id => `<@${id}>`).join(' → ')}\n` +
+          `🎯 地雷番号が1〜10のうちで設定されました！\n` +
+          `最初のターン: <@${game.order[0]}>（3分以内にリアクションを押してください）`
       });
 
-      await startTurn(joinMsg, gameStates.get(channelId));
+      for (const emoji of numberEmojis) {
+        await playMsg.react(emoji);
+      }
+
+      startTurn(playMsg, game, channelId);
     });
   }
 };
 
-function makeNumberButtons(usedSet) {
-  const row = new ActionRowBuilder();
-  for (let i = 1; i <= 5; i++) {
-    row.addComponents(
-      new ButtonBuilder()
-        .setCustomId(`kurohige_pick_${i}`)
-        .setLabel(`${i}`)
-        .setStyle(ButtonStyle.Secondary)
-        .setDisabled(usedSet.has(i))
-    );
-  }
-  return row;
-}
+async function startTurn(msg, game, channelId) {
+  const currentId = game.order[game.turn];
 
-function startTurn(msg, game) {
-  const channelId = msg.channel.id;
-  const currentPlayer = game.turnOrder[game.turnIndex];
-
-  const collector = msg.createMessageComponentCollector({
-    componentType: ComponentType.Button,
+  const collector = msg.createReactionCollector({
+    filter: (r, u) => !u.bot && numberEmojis.includes(r.emoji.name),
     time: 3 * 60 * 1000
   });
 
-  collector.on('collect', async btn => {
-    const uid = btn.user.id;
-    const selected = Number(btn.customId.split('_').pop());
+  collector.on('collect', async (reaction, user) => {
+    const emoji = reaction.emoji.name;
+    const number = emojiToNumber[emoji];
+    const uid = user.id;
 
-    if (uid !== currentPlayer) {
-      return btn.reply({ content: '今はあなたのターンではありません。', ephemeral: true });
+    if (game.used.has(number)) {
+      await reaction.users.remove(uid);
+      return;
     }
 
-    if (game.usedNumbers.has(selected)) {
-      return btn.reply({ content: 'その番号はすでに選ばれています。', ephemeral: true });
+    if (uid !== currentId) {
+      await reaction.users.remove(uid); // ターン外ユーザーのリアクション削除
+      return;
     }
 
-    game.usedNumbers.add(selected);
+    game.used.add(number);
 
-    if (selected === game.bombNumber) {
-      await btn.reply(`💥 ${selected} を選んで爆発！<@${uid}> の負けです！`);
-      await msg.edit({
-        content:
-          `💣 地雷は **${selected}** でした！\n爆発したのは <@${uid}> さんです！`,
-        components: []
-      });
-      collector.stop('end');
-      gameStates.delete(channelId);
+    if (number === game.bomb) {
+      await msg.channel.send(`💥 <@${uid}> が ${emoji} を選んで爆発！地雷でした…`);
+      collector.stop('boom');
+      games.delete(channelId);
     } else {
-      await btn.reply(`✅ ${selected} はセーフ！`);
-      game.turnIndex = (game.turnIndex + 1) % game.turnOrder.length;
-      const nextPlayer = game.turnOrder[game.turnIndex];
-
-      await msg.edit({
-        content:
-          `✅ <@${uid}> が ${selected} を選びました → セーフ！\n` +
-          `次のターン: <@${nextPlayer}>（3分以内に選択してください）`,
-        components: [makeNumberButtons(game.usedNumbers)]
-      });
-
-      collector.stop('continue');
-      startTurn(msg, gameStates.get(channelId));
+      await msg.channel.send(`✅ <@${uid}> が ${emoji} を選択 → セーフ！`);
+      game.turn = (game.turn + 1) % game.order.length;
+      const nextPlayer = game.order[game.turn];
+      await msg.channel.send(`🕹️ 次のターン: <@${nextPlayer}>（3分以内にリアクションを押してください）`);
+      collector.stop('next');
+      startTurn(msg, games.get(channelId), channelId);
     }
   });
 
   collector.on('end', async (_, reason) => {
-    if (reason === 'end' || reason === 'continue') return;
-    await msg.edit({
-      content: `⏱ <@${currentPlayer}> が3分以内に選択しなかったため、ゲームは終了しました。`,
-      components: []
-    });
-    gameStates.delete(channelId);
+    if (!games.has(channelId)) return;
+    if (reason !== 'boom' && reason !== 'next') {
+      const current = game.order[game.turn];
+      await msg.channel.send(`⏱ <@${current}> が時間切れ！ゲーム終了。`);
+      games.delete(channelId);
+    }
   });
 }
