@@ -12,7 +12,7 @@ const gameStates = new Map(); // チャンネルID → ゲーム状態
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('kurohige')
-    .setDescription('黒ひげ危機一髪風ミニゲーム（順番＆ターン制限あり）'),
+    .setDescription('黒ひげ危機一髪風ミニゲームを開始します'),
 
   async execute(client, interaction) {
     const channelId = interaction.channelId;
