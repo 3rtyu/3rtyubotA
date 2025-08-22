@@ -1,253 +1,218 @@
 // commands/rps.js
-const {
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  ButtonBuilder,
-  ButtonStyle,
-  ComponentType
-} = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 
 const games = new Map(); // channelId → GameSession
 
-// 定数化した手の情報
+// 絵文字定義
+const EMOJI = {
+  JOIN: '➕',
+  START: '▶️',
+  ROCK: '✊',
+  PAPER: '✋',
+  SCISSORS: '✌️'
+};
+
+// 手の定義
 const HANDS = [
-  { key: 'rock',     id: 'rps_rock',     label: 'グー',   beats: 'scissors' },
-  { key: 'paper',    id: 'rps_paper',    label: 'パー',   beats: 'rock' },
-  { key: 'scissors', id: 'rps_scissors', label: 'チョキ', beats: 'paper' }
+  { key: 'rock',     label: 'グー',   emoji: EMOJI.ROCK,     beats: 'scissors' },
+  { key: 'paper',    label: 'パー',   emoji: EMOJI.PAPER,    beats: 'rock'     },
+  { key: 'scissors', label: 'チョキ', emoji: EMOJI.SCISSORS, beats: 'paper'    }
 ];
-// カスタムID から手オブジェクトを引くマップ
-const ID_TO_HAND = HANDS.reduce((m, h) => m.set(h.id, h), new Map());
+// 絵文字 → hand.key マッピング
+const EMOJI_TO_KEY = HANDS.reduce((map, h) => {
+  map[h.emoji] = h.key;
+  return map;
+}, {});
 
 class GameSession {
   constructor(interaction) {
     this.interaction = interaction;
     this.channelId   = interaction.channelId;
     this.hostId      = interaction.user.id;
-    this.players     = [];        // 参加者ユーザーID の順序を保持
-    this.picks       = new Map(); // userId → hand.key
-    this.joinMessage = null;      // 最初に送る参加メッセージ
-    this.collectors  = [];        // 後で一括クリアのために保持
+    this.players     = [this.hostId];    // 参加者 ID の配列
+    this.picks       = new Map();        // userId → hand.key
+    this.message     = null;             // 進行メッセージ
   }
 
   async run() {
-    this.players.push(this.hostId);
     await this._sendJoinPrompt();
-    const joined = await this._collectJoins();
+    const started = await this._collectJoins();
 
-    if (!joined) {
-      await this._cleanup(`参加者が揃わなかったため、じゃんけんをキャンセルしました。`);
+    if (!started) {
+      await this._finalize('参加者が揃わなかったため、じゃんけんをキャンセルしました。');
       games.delete(this.channelId);
       return;
     }
 
-    // ラウンドをループ（あいこが出たら再度）
-    let winnerIds;
+    let winners;
+    // あいこならループ
     do {
       this.picks.clear();
-      winnerIds = await this._playOneRound();
-    } while (!winnerIds);
+      winners = await this._playRound();
+    } while (winners === null);
 
-    await this._announceResult(winnerIds);
+    await this._announceResult(winners);
     games.delete(this.channelId);
   }
 
-  // 参加受付メッセージを出して、開始ボタンを主催者から受け取る
+  // 参加と開始待ち
   async _sendJoinPrompt() {
-    const joinRow = new ActionRowBuilder().addComponents(
-      new ButtonBuilder()
-        .setCustomId('rps_join')
-        .setLabel('参加する')
-        .setStyle(ButtonStyle.Primary),
-      new ButtonBuilder()
-        .setCustomId('rps_start')
-        .setLabel('開始する')
-        .setStyle(ButtonStyle.Success)
-    );
-
-    this.joinMessage = await this.interaction.reply({
+    this.message = await this.interaction.reply({
       content:
         `${this.interaction.user.username} さんがじゃんけんを開始しました！\n` +
-        '参加したい人は「参加する」を押してください。\n' +
-        '参加者が2人以上集まったら主催者が「開始する」を押してください。（30秒で自動終了）',
-      components: [joinRow],
+        `参加 → ${EMOJI.JOIN}  開始 → ${EMOJI.START}\n` +
+        '参加者が2人以上になったら主催者が開始絵文字をリアクションしてください。',
       fetchReply: true
     });
+
+    // リアクションを追加
+    try {
+      await this.message.react(EMOJI.JOIN);
+      await this.message.react(EMOJI.START);
+    } catch (err) {
+      console.error('リアクション追加失敗:', err);
+    }
   }
 
-  // 参加者を集める。成功なら true、失敗なら false
   _collectJoins() {
     return new Promise(resolve => {
-      const collector = this.joinMessage.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: 30_000
-      });
-      this.collectors.push(collector);
+      const filter = (reaction, user) => {
+        if (user.bot) return false;
+        return [EMOJI.JOIN, EMOJI.START].includes(reaction.emoji.name);
+      };
+      const collector = this.message.createReactionCollector({ filter, time: 30_000 });
 
-      collector.on('collect', async btnInt => {
-        try {
-          if (btnInt.customId === 'rps_join') {
-            if (this.players.includes(btnInt.user.id)) {
-              return btnInt.reply({ content: '既に参加済みです。', ephemeral: true });
-            }
-            this.players.push(btnInt.user.id);
-            await btnInt.reply({
-              content: `参加完了！現在の参加者数: ${this.players.length}`,
-              ephemeral: true
-            });
-          } else if (btnInt.customId === 'rps_start') {
-            if (btnInt.user.id !== this.hostId) {
-              return btnInt.reply({ content: '開始できるのは主催者のみです。', ephemeral: true });
-            }
-            if (this.players.length < 2) {
-              return btnInt.reply({ content: '参加者が2人以上必要です。', ephemeral: true });
-            }
+      collector.on('collect', (reaction, user) => {
+        const name = reaction.emoji.name;
+        if (name === EMOJI.JOIN) {
+          if (!this.players.includes(user.id)) {
+            this.players.push(user.id);
+            this._updateJoinPrompt();
+          }
+        } else if (name === EMOJI.START && user.id === this.hostId) {
+          if (this.players.length >= 2) {
             collector.stop('started');
           }
-        } catch (err) {
-          console.error('参加収集エラー:', err);
         }
       });
 
       collector.on('end', async (_, reason) => {
-        // ボタンを無効化
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ...this.joinMessage.components[0].components.map(btn => btn.setDisabled(true))
-        );
-        try {
-          await this.joinMessage.edit({ components: [disabledRow] });
-        } catch (err) {
-          console.error('参加メッセージ無効化失敗:', err);
-        }
+        // リアクションをクリア
+        try { await this.message.reactions.removeAll(); }
+        catch (err) { console.error('リアクション削除失敗:', err); }
+
         resolve(reason === 'started');
       });
     });
   }
 
-  // 1ラウンド分プレイし、勝者IDの配列を返す。あいこなら null
-  _playOneRound() {
-    return new Promise(resolve => {
-      const pickRow = new ActionRowBuilder().addComponents(
-        ...HANDS.map(h =>
-          new ButtonBuilder()
-            .setCustomId(h.id)
-            .setLabel(h.label)
-            .setStyle(ButtonStyle.Secondary)
-        )
-      );
-
-      this.joinMessage.edit({
-        content: '手を選んでください。',
-        components: [pickRow]
-      }).catch(err => console.error('ラウンド開始メッセージ編集失敗:', err));
-
-      const collector = this.joinMessage.createMessageComponentCollector({
-        componentType: ComponentType.Button,
-        time: 30_000
+  // 参加数更新
+  async _updateJoinPrompt() {
+    try {
+      await this.message.edit({
+        content:
+          `${this.interaction.user.username} さんがじゃんけんを開始しました！\n` +
+          `参加 → ${EMOJI.JOIN}  開始 → ${EMOJI.START}\n` +
+          `現在の参加者: ${this.players.length}人\n` +
+          '参加者が2人以上になったら主催者が開始絵文字をリアクションしてください。'
       });
-      this.collectors.push(collector);
+    } catch (err) {
+      console.error('参加数更新失敗:', err);
+    }
+  }
 
-      collector.on('collect', async pickInt => {
-        if (!this.players.includes(pickInt.user.id)) return;
-        if (this.picks.has(pickInt.user.id)) {
-          return pickInt.reply({ content: '既に選択済みです。', ephemeral: true });
+  // 1ラウンド分の手集め
+  _playRound() {
+    return new Promise(resolve => {
+      // 手のリアクションを追加
+      HANDS.forEach(h => this.message.react(h.emoji)).catch(console.error);
+      // メッセージ更新
+      this.message.edit({ content: '手を選んでください → ✊/✋/✌️' }).catch(console.error);
+
+      const filter = (reaction, user) => {
+        if (user.bot) return false;
+        return this.players.includes(user.id) && Object.values(EMOJI).includes(reaction.emoji.name);
+      };
+      const collector = this.message.createReactionCollector({ filter, time: 30_000 });
+
+      collector.on('collect', (reaction, user) => {
+        const handKey = EMOJI_TO_KEY[reaction.emoji.name];
+        if (!handKey) return;
+        if (!this.picks.has(user.id)) {
+          this.picks.set(user.id, handKey);
         }
-
-        const hand = ID_TO_HAND.get(pickInt.customId);
-        if (!hand) return;
-
-        this.picks.set(pickInt.user.id, hand.key);
-        await pickInt.reply({ content: `あなたの手: ${hand.label}`, ephemeral: true });
-
+        // 全員選択済みなら終了
         if (this.picks.size === this.players.length) {
           collector.stop('all_picked');
         }
       });
 
       collector.on('end', async (_, reason) => {
-        // 選択ボタンを無効化
-        const disabledRow = new ActionRowBuilder().addComponents(
-          ...this.joinMessage.components[0].components.map(btn => btn.setDisabled(true))
-        );
-        await this.joinMessage.edit({ components: [disabledRow] }).catch(console.error);
+        // 反応クリア
+        try { await this.message.reactions.removeAll(); }
+        catch (err) { console.error('リアクション削除失敗:', err); }
 
-        // 全員選択したかチェック
+        // 全員選択完了していなければキャンセル
         if (reason !== 'all_picked' || this.picks.size < this.players.length) {
-          // タイムアウト or 不足 → キャンセル
-          await this.joinMessage.edit({
-            content: '時間切れか選択不足のため、ゲームを終了します。',
-            components: []
-          });
-          return resolve([]); // 勝者なし
+          await this._finalize('時間切れか選択不足によりゲームを終了しました。');
+          return resolve([]); // no winners
         }
 
-        // 判定
+        // あいこ判定: 手の種類カウント
         const counts = {};
-        this.picks.forEach(handKey => {
-          counts[handKey] = (counts[handKey] || 0) + 1;
-        });
-        const usedHands = Object.keys(counts);
-        if (usedHands.length !== 2) {
-          // 全員同じ or ３種 → あいこ
-          await this.joinMessage.edit({
-            content: 'あいこです！もう一度手を選んでください。',
-            components: []
-          });
+        this.picks.forEach(key => counts[key] = (counts[key] || 0) + 1);
+        const used = Object.keys(counts);
+        if (used.length !== 2) {
+          // 全員同じ or 3種 → あいこ
+          await this.message.edit({ content: 'あいこです！もう一回…' }).catch(console.error);
           return resolve(null);
         }
 
-        // どの手が勝つかを決定
+        // 勝つ手を決定
         const winKey = HANDS.find(h =>
-          usedHands.includes(h.key) &&
-          usedHands.includes(h.beats)
-        )?.key;
+          used.includes(h.key) && used.includes(h.beats)
+        ).key;
 
         // 勝者リスト
         const winners = [];
-        for (const [uid, handKey] of this.picks) {
-          if (handKey === winKey) winners.push(uid);
+        for (const [uid, key] of this.picks) {
+          if (key === winKey) winners.push(uid);
         }
-
         resolve(winners);
       });
     });
   }
 
-  // 最終結果を表示
-  async _announceResult(winnerIds) {
-    let text = '結果発表！\n';
-    this.players.forEach(uid => {
-      const handKey = this.picks.get(uid);
-      const handLabel = HANDS.find(h => h.key === handKey)?.label || '―';
-      text += `<@${uid}>: ${handLabel}\n`;
-    });
-    if (winnerIds.length) {
-      const mentions = winnerIds.map(id => `<@${id}>`).join('、');
-      text += `\n勝者: ${mentions}`;
-    } else {
-      text += `\n勝者なし（タイムアウトまたは全員パス）`;
-    }
-
+  // 結果発表 or キャンセル
+  async _finalize(text) {
     try {
-      await this.joinMessage.edit({ content: text, components: [] });
+      await this.message.edit({ content: text, components: [] });
     } catch (err) {
-      console.error('結果発表失敗:', err);
+      console.error('最終メッセージ編集失敗:', err);
     }
   }
 
-  // メッセージをキャンセル文言に置き換え＆コンポーネント削除
-  async _cleanup(cancelText) {
-    try {
-      await this.joinMessage.edit({ content: cancelText, components: [] });
-    } catch (err) {
-      console.error('キャンセル編集失敗:', err);
+  // 勝者発表
+  async _announceResult(winners) {
+    let text = `結果発表！\n`;
+    this.players.forEach(uid => {
+      const key = this.picks.get(uid);
+      const label = HANDS.find(h => h.key === key)?.label || '―';
+      text += `<@${uid}>: ${label}\n`;
+    });
+    if (winners.length) {
+      text += `\n勝者: ${winners.map(id => `<@${id}>`).join('、')}`;
+    } else {
+      text += `\n勝者なし`;
     }
+    await this._finalize(text);
   }
 }
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('rps2')
-    .setDescription('複数人でじゃんけんを開始します'),
+    .setDescription('3人以上でじゃんけんを開始します'),
   async execute(client, interaction) {
     if (games.has(interaction.channelId)) {
       return interaction.reply({
@@ -255,7 +220,6 @@ module.exports = {
         ephemeral: true
       });
     }
-
     const session = new GameSession(interaction);
     games.set(interaction.channelId, session);
     session.run();
