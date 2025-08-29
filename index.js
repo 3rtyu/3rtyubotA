@@ -15,8 +15,8 @@ const commandsPath = path.join(__dirname, 'commands');
 fs.readdirSync(commandsPath)
   .filter(file => file.endsWith('.js'))
   .forEach(file => {
-    const cmd = require(path.join(commandsPath, file));
-    client.commands.set(cmd.data.name, cmd);
+    const command = require(path.join(commandsPath, file));
+    client.commands.set(command.data.name, command);
   });
 
 // ❸ Bot 起動完了ログ
@@ -27,31 +27,34 @@ client.once('ready', () => {
 // ❹ interactionCreate でスラッシュコマンドとボタン両対応
 client.on('interactionCreate', async interaction => {
   try {
-    // 1) スラッシュコマンドの場合
+    // スラッシュコマンド処理
     if (interaction.isChatInputCommand()) {
       const command = client.commands.get(interaction.commandName);
-      if (!command) return;
-      await command.execute(client, interaction);
-      return;
+      if (!command) {
+        return interaction.reply({ content: 'コマンドが見つかりません', ephemeral: true });
+      }
+      return command.execute(client, interaction);
     }
 
-    // 2) ボタン押下の場合
+    // ボタン押下処理
     if (interaction.isButton()) {
-      const id = interaction.customId;
+      // deferReply を一度だけ呼び出して 3 秒ルールをクリア
+      await interaction.deferReply({ ephemeral: true });
 
+      const id = interaction.customId;
       if (id === 'gacha_1') {
         await runGacha(interaction, 1);
-
-      } else if (id === 'gacha_10') {
+      }
+      else if (id === 'gacha_10') {
         await runGacha(interaction, 10);
-
-      } else {
-        // 想定外の customId が来た場合
-        await interaction.reply({ content: '不明な操作です', ephemeral: true });
+      }
+      else {
+        await interaction.editReply({ content: '不明な操作です' });
       }
     }
-  } catch (err) {
-    console.error('interactionCreate エラー:', err);
+  } catch (error) {
+    console.error('interactionCreate エラー:', error);
+
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({ content: '内部エラーが発生しました', ephemeral: true });
     } else {

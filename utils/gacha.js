@@ -34,39 +34,34 @@ const roleNames = {
 };
 
 /**
- * runGacha:
- *   ・interactionCreate で deferReply を行ったあとに呼び出す前提
- *   ・ガチャを count 回実行し、結果をまとめた Embed を editReply で返却
- *   ・ロール付与に失敗しても処理を継続し、エラーはコンソールに出力
+ * runGacha
+ *  ・count 回ガチャを回し、結果をまとめて出力
+ *  ・ロール付与に失敗しても処理を継続（エラーはコンソール出力）
+ *  ・あらかじめ deferReply() を呼んだ interaction に対して editReply() で応答
  */
 async function runGacha(interaction, count) {
-  // Interaction を ACK して 3 秒ルールをクリア
-  // ※index.js で deferReply を呼んでいない場合はここで deferReply してもOK
-  await interaction.deferReply({ ephemeral: true });
-
   const results = [];
 
   for (let i = 0; i < count; i++) {
-    // 1) レアリティ選択
-    const totalWeight = Object.values(rarityWeights).reduce((a, b) => a + b, 0);
-    let rnd = Math.random() * totalWeight;
-    let selectedRarity;
+    // レアリティ選択
+    const total = Object.values(rarityWeights).reduce((a, b) => a + b, 0);
+    let rnd = Math.random() * total;
+    let selected;
     for (const [rarity, weight] of Object.entries(rarityWeights)) {
       if (rnd < weight) {
-        selectedRarity = rarity;
+        selected = rarity;
         break;
       }
       rnd -= weight;
     }
 
-    // 2) アイテム抽選
-    const pool = itemsByRarity[selectedRarity];
+    // アイテム抽選
+    const pool = itemsByRarity[selected];
     const item = pool[Math.floor(Math.random() * pool.length)];
+    results.push(`${selected} … **${item}**`);
 
-    results.push(`${selectedRarity} … **${item}**`);
-
-    // 3) ロール付与（失敗はログにのみ出力）
-    const roleName = roleNames[selectedRarity];
+    // ロール付与（失敗はログ出力のみ）
+    const roleName = roleNames[selected];
     const role = interaction.guild.roles.cache.find(r => r.name === roleName);
     if (role) {
       try {
@@ -79,14 +74,14 @@ async function runGacha(interaction, count) {
     }
   }
 
-  // 4) Embed にまとめて送信
+  // Embed にまとめて送信
   const embed = new EmbedBuilder()
     .setTitle(`🎉 ${count}回ガチャ結果 🎉`)
     .setDescription(results.join('\n'))
-    .setColor(0x00AE86)
+    .setColor(colorMap['✨SECRET✨']) // デフォルト色。必要なら変更可
     .setTimestamp();
 
-  // deferReply の後は editReply で結果を返す
+  // deferReply のあとはこちらで editReply を呼び出す
   await interaction.editReply({ embeds: [embed] });
 }
 
