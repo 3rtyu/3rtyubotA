@@ -6,10 +6,10 @@ module.exports = {
     .setDescription('ガチャを引きます！！'),
   async execute(client, interaction) {
     const rarityWeights = {
-      '⭐️': 59.9999,
-      '⭐⭐': 30,
-      '⭐⭐⭐': 7,
-      '⭐⭐⭐⭐': 3,
+      '⭐️':    59.9999,
+      '⭐⭐':    30,
+      '⭐⭐⭐':   7,
+      '⭐⭐⭐⭐':  3,
       '✨SECRET✨': 0.0001
     };
 
@@ -21,23 +21,23 @@ module.exports = {
       '✨SECRET✨': ['余ったレコード']
     };
 
-    // カラーコードを変更
     const colorMap = {
-      '⭐️':   0xAAAAAA, // グレー
-      '⭐⭐':   0x9ACD32, // 黄緑
-      '⭐⭐⭐':  0x0000FF, // 青
-      '⭐⭐⭐⭐': 0xFF69B4, // ピンク
+      '⭐️':    0xAAAAAA,  // グレー
+      '⭐⭐':    0x9ACD32,  // 黄緑
+      '⭐⭐⭐':   0x0000FF,  // 青
+      '⭐⭐⭐⭐':  0xFF69B4,  // ピンク
       '✨SECRET✨': 0xFF0000 // 赤
     };
 
     const roleNames = {
-      '⭐️': '星1を引き当てた!',
-      '⭐⭐': '星2を引き当てた!',
-      '⭐⭐⭐': '星3を引き当てた!',
-      '⭐⭐⭐⭐': '星4を引き当てた!',
+      '⭐️':    '星1を引き当てた!',
+      '⭐⭐':    '星2を引き当てた!',
+      '⭐⭐⭐':   '星3を引き当てた!',
+      '⭐⭐⭐⭐':  '星4を引き当てた!',
       '✨SECRET✨': 'シークレットを引き当てた!'
     };
 
+    // ガチャ処理
     const totalWeight = Object.values(rarityWeights).reduce((a, b) => a + b, 0);
     let rand = Math.random() * totalWeight;
     let selectedRarity;
@@ -52,6 +52,7 @@ module.exports = {
     const pool = itemsByRarity[selectedRarity];
     const pulledItem = pool[Math.floor(Math.random() * pool.length)];
 
+    // 結果を埋め込みで送信
     const embed = new EmbedBuilder()
       .setTitle('🎉 ガチャ結果 🎉')
       .setDescription(`あなたは **${selectedRarity}** を引き当てた！\n\n**${pulledItem}** を手に入れたよ！`)
@@ -60,7 +61,7 @@ module.exports = {
 
     await interaction.reply({ embeds: [embed] });
 
-    // ロール付与処理
+    // ロール付与処理（フィードバックメッセージは一切送らない）
     const guild = interaction.guild;
     const member = interaction.member;
     const roleName = roleNames[selectedRarity];
@@ -69,13 +70,11 @@ module.exports = {
     if (role) {
       try {
         await member.roles.add(role);
-        await interaction.followUp({ content: `🎁 あなたには「${role.name}」ロールが付与されました！`, ephemeral: true });
       } catch (error) {
         console.error('ロール付与エラー:', error);
-        await interaction.followUp({ content: 'ロールの付与に失敗しました。管理者に連絡してください。', ephemeral: true });
       }
     } else {
-      await interaction.followUp({ content: `ロール「${roleName}」が見つかりませんでした。`, ephemeral: true });
+      console.error(`ロール「${roleName}」が見つかりませんでした。`);
     }
   },
 };
