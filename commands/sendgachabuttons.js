@@ -3,7 +3,7 @@ const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = re
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('sendgachabuttons')
-    .setDescription('このコマンドは使用しないでください'),
+    .setDescription('このコマンドは使用しないでください!!'),
   async execute(client, interaction) {
     // 1回引き用ボタン
     const buttonOnce = new ButtonBuilder()
