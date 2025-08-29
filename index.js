@@ -26,23 +26,31 @@ client.once('ready', () => {
 // ❹ interactionCreate でスラッシュ＆ボタン両対応
 client.on('interactionCreate', async interaction => {
   try {
-    // スラッシュコマンド処理
-    if (interaction.isCommand()) {
-      const cmd = client.commands.get(interaction.commandName);
-      if (cmd) await cmd.execute(client, interaction);
-      return;
-    }
+    // ボタン以外はスルー
+    if (!interaction.isButton()) return;
 
-    // ボタン押下処理
-    if (interaction.isButton()) {
-      if (interaction.customId === 'gacha_1') {
-        await runGacha(interaction, 1);
-      } else if (interaction.customId === 'gacha_10') {
-        await runGacha(interaction, 10);
-      }
+    // ←←← ここで最初に deferReply を呼ぶ
+    await interaction.deferReply({ ephemeral: true });
+
+    // 押されたボタンに応じてガチャ処理を呼び出し
+    if (interaction.customId === 'gacha_1') {
+      await runGacha(interaction, 1);    // runGacha は editReply を使う想定
     }
-  } catch (err) {
-    console.error('interactionCreate エラー:', err);
+    else if (interaction.customId === 'gacha_10') {
+      await runGacha(interaction, 10);
+    }
+    else {
+      // 万一別の customId が来たときの保険
+      await interaction.editReply('不明な操作です');
+    }
+  }
+  catch (err) {
+    console.error('ボタンハンドラでエラー:', err);
+    if (interaction.deferred || interaction.replied) {
+      await interaction.followUp({ content: '内部エラーが発生しました', ephemeral: true });
+    } else {
+      await interaction.reply({ content: '内部エラーが発生しました', ephemeral: true });
+    }
   }
 });
 
