@@ -1,3 +1,4 @@
+// index.js
 // ❶ .env を読み込む
 require('dotenv').config();
 
@@ -23,29 +24,34 @@ client.once('ready', () => {
   console.log(`${client.user.tag} でログインしました`);
 });
 
-// ❹ interactionCreate でスラッシュ＆ボタン両対応
+// ❹ interactionCreate でスラッシュコマンドとボタン両対応
 client.on('interactionCreate', async interaction => {
   try {
-    // ボタン以外はスルー
-    if (!interaction.isButton()) return;
+    // 1) スラッシュコマンドの場合
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) return;
+      await command.execute(client, interaction);
+      return;
+    }
 
-    // ←←← ここで最初に deferReply を呼ぶ
-    await interaction.deferReply({ ephemeral: true });
+    // 2) ボタン押下の場合
+    if (interaction.isButton()) {
+      const id = interaction.customId;
 
-    // 押されたボタンに応じてガチャ処理を呼び出し
-    if (interaction.customId === 'gacha_1') {
-      await runGacha(interaction, 1);    // runGacha は editReply を使う想定
+      if (id === 'gacha_1') {
+        await runGacha(interaction, 1);
+
+      } else if (id === 'gacha_10') {
+        await runGacha(interaction, 10);
+
+      } else {
+        // 想定外の customId が来た場合
+        await interaction.reply({ content: '不明な操作です', ephemeral: true });
+      }
     }
-    else if (interaction.customId === 'gacha_10') {
-      await runGacha(interaction, 10);
-    }
-    else {
-      // 万一別の customId が来たときの保険
-      await interaction.editReply('不明な操作です');
-    }
-  }
-  catch (err) {
-    console.error('ボタンハンドラでエラー:', err);
+  } catch (err) {
+    console.error('interactionCreate エラー:', err);
     if (interaction.deferred || interaction.replied) {
       await interaction.followUp({ content: '内部エラーが発生しました', ephemeral: true });
     } else {
@@ -57,4 +63,3 @@ client.on('interactionCreate', async interaction => {
 // ❺ 環境変数から一度だけログイン
 client.login(process.env.DISCORD_TOKEN)
   .catch(err => console.error('Login エラー:', err));
-
