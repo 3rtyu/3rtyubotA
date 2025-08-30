@@ -4,7 +4,8 @@ const {
   PermissionFlagsBits,
   ActionRowBuilder,
   ButtonBuilder,
-  ButtonStyle
+  ButtonStyle,
+  EmbedBuilder
 } = require('discord.js');
 
 module.exports = {
@@ -14,6 +15,7 @@ module.exports = {
     .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
 
   async execute(client, interaction) {
+    // 1連/10連ボタン
     const row = new ActionRowBuilder().addComponents(
       new ButtonBuilder()
         .setCustomId('gacha_one')
@@ -25,10 +27,34 @@ module.exports = {
         .setStyle(ButtonStyle.Success)
     );
 
+    // Embed で排出率を「中央寄せ」っぽく表示
+    const embed = new EmbedBuilder()
+      .setTitle('**プロセカ(?)ガチャ！**')
+      .addFields(
+        // 左側を空白フィールドで埋める
+        { name: '\u200B', value: '\u200B', inline: true },
+        // 真ん中に並べたい排出率
+        {
+          name: '📊 排出率',
+          value: [
+            '⭐️: 59.9999%',
+            '⭐⭐: 30%',
+            '⭐⭐⭐: 7%',
+            '⭐⭐⭐⭐: 3%',
+          ].join('\n'),
+          inline: true
+        },
+        // 右側も空白で埋める
+        { name: '\u200B', value: '\u200B', inline: true }
+      )
+      .setColor(0x00AE86);
+
+    // 管理者への確認レスポンス（ephemeral）
     await interaction.reply({ content: 'ガチャボタンを設置しました！', ephemeral: true });
 
+    // 実際のガチャメッセージをチャンネルに送信
     await interaction.channel.send({
-      content: '🔮 **誰でも何度でも引けるガチャ** 🔮',
+      embeds: [embed],
       components: [row]
     });
   }
