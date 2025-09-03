@@ -1,10 +1,10 @@
 // utils/gacha.js
 const rarityWeights = {
-  '⭐️':     59.9999,
+  '⭐️':     56.999,
   '⭐⭐':     30,
   '⭐⭐⭐':    7,
-  '⭐⭐⭐⭐':   3,
-  '✨SECRET✨': 0.0001
+  '⭐⭐⭐⭐':   6,
+  '✨SECRET✨': 0.001
 };
 
 const itemsByRarity = {
