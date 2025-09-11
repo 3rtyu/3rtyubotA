@@ -3,7 +3,7 @@ const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('random all')
+    .setName('randomall')
     .setDescription('各難易度ごとにランダムに曲を選びます(master基準)')
     .addIntegerOption(option =>
       option
