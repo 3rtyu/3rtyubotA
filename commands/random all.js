@@ -1,28 +1,21 @@
 // commands/random.js
-const {
-  SlashCommandBuilder,
-  ActionRowBuilder,
-  StringSelectMenuBuilder,
-} = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('random')
-    .setDescription('難易度を指定して曲をランダム選択します')
-    .addIntegerOption(opt =>
-      opt
+    .setName('random all')
+    .setDescription('各難易度ごとにランダムに曲を選びます(master基準)')
+    .addIntegerOption(option =>
+      option
         .setName('count')
-        .setDescription('何曲選ぶか (1〜13)')
+        .setDescription('希望の曲数を入力してください(1～13)')
+        .setRequired(false)
         .setMinValue(1)
         .setMaxValue(13)
-        .setRequired(false)
     ),
 
   async execute(client, interaction) {
-    // デフォルトは1曲
-    const count = interaction.options.getInteger('count') ?? 1;
-
-    // 各集合（難易度）と曲リスト
+    // ↓ 各集合に名前を付けて定義 ↓
     const allSets = [
       { name: '難易度25', items: ['25時の情熱', '余花にみとれて'] },
       { name: '難易度26', items: ['	Tell Your World', '	自傷無色', '独りんぼエンヴィー','ECHO','アイノマテリアル','カナデトモスソラ','再生','ray','メタモリボン','ノマド','オーダーメイド','メリュー','君の夜をくれ','泥中に咲く','いちにのさんで','それがあなたの幸せとしても','夜明けと蛍','Goodbye','Copycat','Where shall we go?','エピローグに君はいない','インタビュア','相生','glow','心做し','トワイライトライト','ハッピーチートデー','ハジメテノオト','すれすれ','彗星ノ銀河','クリスタルスノウ','Packaged','回る空うさぎ','Intergalactic Bound'] },
@@ -39,75 +32,41 @@ module.exports = {
       { name: '難易度37', items: ['Whats up? Pop!', 'ヤミナベ!!!!', '人生'] },
     ];
 
-    // SelectMenu を組み立て
-    const menu = new StringSelectMenuBuilder()
-      .setCustomId('select_sets')
-      .setPlaceholder('難易度を選んでください (複数可)')
-      .setMinValues(1)
-      .setMaxValues(allSets.length)
-      .addOptions(
-        allSets.map(set => ({
-          label:    set.name,
-          value:    set.name,
-          description: `曲数: ${set.items.length}`,
-        }))
-      );
+    // オプションから取得／デフォルトは1
+    const count = interaction.options.getInteger('count') ?? 1;
 
-    const row = new ActionRowBuilder().addComponents(menu);
+    // 配列からランダムに1要素を取得
+    const pickRandom = arr =>
+      arr[Math.floor(Math.random() * arr.length)];
 
-    // Ephemeral でプルダウンを送信
-    await interaction.reply({
-      content: 'どの難易度から曲を選びますか？',
-      components: [row],
-      ephemeral: true,
-    });
-
-    // ユーザーからのセレクトを待つ
-    const filter = i =>
-      i.isStringSelectMenu() &&
-      i.customId === 'select_sets' &&
-      i.user.id === interaction.user.id;
-
-    const collector = interaction.channel.createMessageComponentCollector({
-      filter,
-      max: 1,
-      time: 60_000,
-    });
-
-    collector.on('collect', async selectInter => {
-      const chosenNames = selectInter.values; // ['難易度26','難易度28',…]
-      const selectedSets = allSets.filter(s => chosenNames.includes(s.name));
-      const pool = selectedSets.flatMap(s => s.items);
-
-      // 欲しい曲数が総プールを超えていないかチェック
-      if (count > pool.length) {
-        return selectInter.update({
-          content: `プール内の要素(${pool.length})より多い数は選べません。`,
-          components: [],
-        });
+    // 0～(total-1) をシャッフルして先頭num個を返す
+    const sampleIndices = (total, num) => {
+      const idx = Array.from({ length: total }, (_, i) => i);
+      for (let i = idx.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [idx[i], idx[j]] = [idx[j], idx[i]];
       }
+      return idx.slice(0, num);
+    };
 
-      // Fisher–Yates でシャッフルして先頭 count 個を取る
-      const sample = (arr, n) => {
-        const a = [...arr];
-        for (let i = a.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [a[i], a[j]] = [a[j], a[i]];
-        }
-        return a.slice(0, n);
-      };
+    // ランダムに count 個の集合インデックスを取得
+    const indices = sampleIndices(allSets.length, count);
 
-      const picks = sample(pool, count);
-      const header = `【${chosenNames.join(' / ')}】から${count}曲選出しました：`;
-      const body =
-        count === 1
-          ? `**${picks[0]}**`
-          : picks.map(t => `- **${t}**`).join('\n');
-
-      await selectInter.update({
-        content: `${header}\n${body}`,
-        components: [],
+    // 返信用テキストを組み立て
+    let reply;
+    if (count === 1) {
+      const set   = allSets[indices[0]];
+      const item  = pickRandom(set.items);
+      reply = `【${set.name}】から **${item}** が選ばれました！`;
+    } else {
+      const lines = indices.map(i => {
+        const set  = allSets[i];
+        const item = pickRandom(set.items);
+        return `- 【${set.name}】: **${item}**`;
       });
-    });
+      reply = `\n${lines.join('\n')}\n が選ばれました！`;
+    }
+
+    await interaction.reply({ content: reply, ephemeral: false });
   },
 };
