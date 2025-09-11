@@ -60,7 +60,7 @@ module.exports = {
     } else {
       const lines = indices.map(i => {
         const elem = pickRandom(allSets[i]);
-        return `- 集合${i + 1}: **${elem}**`;
+        return `- ${i + 1}曲目 **${elem}**`;
       });
       reply = `\n${lines.join('\n')} が選ばれました！！`;
     }
