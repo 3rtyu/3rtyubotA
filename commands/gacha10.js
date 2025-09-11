@@ -5,16 +5,16 @@ const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('gacha10')
-    .setDescription('10連ガチャを引きます！！'),
+    .setDescription('ts10連ガチャを引きます！！'),
 
   async execute(client, interaction) {
     // レアリティの重み
     const rarityWeights = {
-      '⭐️': 59.9999,
+      '⭐️': 59.9,
       '⭐⭐': 30,
       '⭐⭐⭐': 7,
       '⭐⭐⭐⭐': 3,
-      '✨SECRET✨': 0.0001
+      '✨SECRET✨': 0.1
     };
 
     // レアリティごとのアイテムプール
