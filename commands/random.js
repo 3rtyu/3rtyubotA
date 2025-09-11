@@ -19,7 +19,6 @@ module.exports = {
     ),
 
   async execute(client, interaction) {
-    // デフォルトは1曲
     const count = interaction.options.getInteger('count') ?? 1;
 
     // 各集合（難易度）と曲リスト
@@ -47,22 +46,19 @@ module.exports = {
       .setMaxValues(allSets.length)
       .addOptions(
         allSets.map(set => ({
-          label:    set.name,
-          value:    set.name,
+          label:       set.name,
+          value:       set.name,
           description: `曲数: ${set.items.length}`,
         }))
       );
 
-    const row = new ActionRowBuilder().addComponents(menu);
-
-    // Ephemeral でプルダウンを送信
     await interaction.reply({
       content: 'どの難易度から曲を選びますか？',
-      components: [row],
+      components: [new ActionRowBuilder().addComponents(menu)],
       ephemeral: true,
     });
 
-    // ユーザーからのセレクトを待つ
+    // メニュー選択を待つ
     const filter = i =>
       i.isStringSelectMenu() &&
       i.customId === 'select_sets' &&
@@ -75,19 +71,21 @@ module.exports = {
     });
 
     collector.on('collect', async selectInter => {
-      const chosenNames = selectInter.values; // ['難易度26','難易度28',…]
-      const selectedSets = allSets.filter(s => chosenNames.includes(s.name));
+      // 選択された難易度名の配列
+      const chosen = selectInter.values; 
+      const selectedSets = allSets.filter(s => chosen.includes(s.name));
       const pool = selectedSets.flatMap(s => s.items);
 
-      // 欲しい曲数が総プールを超えていないかチェック
+      // 数量チェック
       if (count > pool.length) {
-        return selectInter.update({
-          content: `プール内の要素(${pool.length})より多い数は選べません。`,
+        await selectInter.update({
+          content: `プール内の曲数(${pool.length})より多い数は選べません。`,
           components: [],
         });
+        return;
       }
 
-      // Fisher–Yates でシャッフルして先頭 count 個を取る
+      // Fisher–Yates シャッフル
       const sample = (arr, n) => {
         const a = [...arr];
         for (let i = a.length - 1; i > 0; i--) {
@@ -96,17 +94,21 @@ module.exports = {
         }
         return a.slice(0, n);
       };
-
       const picks = sample(pool, count);
-      const header = `【${chosenNames.join(' / ')}】から${count}曲選出しました：`;
+
+      // メニューを消す（エフェメラル側）
+      await selectInter.update({ content: '選択を受け付けました！', components: [] });
+
+      // 公開チャンネルに結果を送信
+      const header = `【${chosen.join(' / ')}】から${count}曲選出しました：`;
       const body =
         count === 1
           ? `**${picks[0]}**`
           : picks.map(t => `- **${t}**`).join('\n');
 
-      await selectInter.update({
+      await interaction.followUp({
         content: `${header}\n${body}`,
-        components: [],
+        ephemeral: false,  // パブリックで送信
       });
     });
   },
