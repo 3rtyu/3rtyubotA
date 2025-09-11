@@ -10,11 +10,11 @@ module.exports = {
   async execute(client, interaction) {
     // レアリティの重み
     const rarityWeights = {
-      '⭐️': 59,
+      '⭐️': 59.1,
       '⭐⭐': 30,
       '⭐⭐⭐': 7,
       '⭐⭐⭐⭐': 3,
-      '✨SECRET✨': 1
+      '✨SECRET✨': 0.9
     };
 
     // レアリティごとのアイテムプール
