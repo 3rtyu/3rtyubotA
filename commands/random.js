@@ -12,9 +12,9 @@ module.exports = {
     .addIntegerOption(opt =>
       opt
         .setName('count')
-        .setDescription('何曲選ぶか (1〜13)')
+        .setDescription('何曲選ぶか (1〜20)')
         .setMinValue(1)
-        .setMaxValue(13)
+        .setMaxValue(20)
         .setRequired(false)
     ),
 
