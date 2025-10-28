@@ -1,4 +1,3 @@
-// commands/keisan.js
 const {
   SlashCommandBuilder,
   ActionRowBuilder,
@@ -9,43 +8,52 @@ const {
 
 const games = new Map();
 
-/** 1〜20のランダム整数を返す */
+/** 5〜20のランダム整数を返す */
 function randInt() {
-  return Math.floor(Math.random() * 20) + 1;
+  return Math.floor(Math.random() * 16) + 5; // 0..15 -> 5..20
 }
 
 /**
  * 計算問題と正解を生成する（掛け算を優先）
+ * 答えは必ず3桁以上（>=100）になるようにループで生成
  * @returns {{ question: string, answer: number }}
  */
 function generateProblem() {
-  const a = randInt();
-  const b = randInt();
-  const c = randInt();
-  const ops = ['+', '-', '*'];
-  const op1 = ops[Math.floor(Math.random() * ops.length)];
-  const op2 = ops[Math.floor(Math.random() * ops.length)];
   const symbolMap = { '+': '+', '-': '-', '*': '×' };
-  const question = `${a} ${symbolMap[op1]} ${b} ${symbolMap[op2]} ${c}`;
 
-  let answer;
-  if (op2 === '*' && (op1 === '+' || op1 === '-')) {
-    // b × c を先に計算
-    const mult = b * c;
-    answer = op1 === '+' ? a + mult : a - mult;
-  } else {
-    // 左から順に処理
-    let interim;
-    if (op1 === '*') interim = a * b;
-    else if (op1 === '+') interim = a + b;
-    else interim = a - b;
+  while (true) {
+    const a = randInt();
+    const b = randInt();
+    const c = randInt();
+    const ops = ['+', '-', '*'];
+    const op1 = ops[Math.floor(Math.random() * ops.length)];
+    const op2 = ops[Math.floor(Math.random() * ops.length)];
+    const question = `${a} ${symbolMap[op1]} ${b} ${symbolMap[op2]} ${c}`;
 
-    if (op2 === '*') answer = interim * c;
-    else if (op2 === '+') answer = interim + c;
-    else answer = interim - c;
+    let answer;
+    if (op2 === '*' && (op1 === '+' || op1 === '-')) {
+      // b × c を先に計算
+      const mult = b * c;
+      answer = op1 === '+' ? a + mult : a - mult;
+    } else {
+      // 左から順に処理
+      let interim;
+      if (op1 === '*') interim = a * b;
+      else if (op1 === '+') interim = a + b;
+      else interim = a - b;
+
+      if (op2 === '*') answer = interim * c;
+      else if (op2 === '+') answer = interim + c;
+      else answer = interim - c;
+    }
+
+    // 条件2: 答えは必ず3桁以上（100以上）
+    if (Number.isFinite(answer) && Math.abs(answer) >= 100) {
+      // 正答が負になるケースを避けるため、負なら再生成
+      if (answer >= 100) return { question, answer };
+    }
+    // 条件を満たさなければ再生成
   }
-
-  return { question, answer };
 }
 
 /**
@@ -56,9 +64,11 @@ function generateProblem() {
 function makeChoices(correct) {
   const set = new Set([correct]);
   while (set.size < 3) {
-    const delta = Math.floor(Math.random() * 11) - 5;
+    // ダミーは正解からのランダムなオフセット（-50〜+50）
+    const delta = Math.floor(Math.random() * 101) - 50;
     const wrong = correct + (delta === 0 ? 1 : delta);
-    if (wrong >= 0) set.add(wrong);
+    // ダミーは3桁以上かつ正であることを保証
+    if (wrong >= 100) set.add(wrong);
   }
   return Array.from(set).sort(() => Math.random() - 0.5);
 }
@@ -98,8 +108,7 @@ module.exports = {
         });
       }
       const game = games.get(channelId);
-      // コレクターを停止して on('end') を呼び出す
-      game.collector.stop('manual');
+      if (game && game.collector) game.collector.stop('manual');
       return interaction.reply({
         content: 'ゲームを停止しました。',
         ephemeral: true
@@ -123,7 +132,7 @@ module.exports = {
     const correctRespondents = new Set();
     const wrongRespondents = new Set();
 
-    // 選択肢ボタン
+    // 選択肢ボタン（最大3つ）
     const choiceRow = new ActionRowBuilder().addComponents(
       choices.map(num =>
         new ButtonBuilder()
@@ -138,7 +147,8 @@ module.exports = {
       content:
         '🧮 3分間の三択計算クイズスタート！\n' +
         `問題: **${question}** = ?\n` +
-        'ボタンをクリックした瞬間に正誤を公開します。',
+        'ボタンをクリックした瞬間に正誤を公開します。' +
+        '\n（数字はすべて 5〜20 の範囲で生成され，答えは3桁以上です）',
       components: [choiceRow],
       fetchReply: true
     });
