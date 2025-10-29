@@ -13,14 +13,14 @@ function randInt() {
   return Math.floor(Math.random() * 16) + 5; // 0..15 -> 5..20
 }
 
+const symbolMap = { '+': '+', '-': '-', '*': '×' };
+
 /**
  * 計算問題と正解を生成する（掛け算を優先）
  * 答えは必ず3桁以上（>=100）になるようにループで生成
  * @returns {{ question: string, answer: number }}
  */
 function generateProblem() {
-  const symbolMap = { '+': '+', '-': '-', '*': '×' };
-
   while (true) {
     const a = randInt();
     const b = randInt();
@@ -32,11 +32,9 @@ function generateProblem() {
 
     let answer;
     if (op2 === '*' && (op1 === '+' || op1 === '-')) {
-      // b × c を先に計算
       const mult = b * c;
       answer = op1 === '+' ? a + mult : a - mult;
     } else {
-      // 左から順に処理
       let interim;
       if (op1 === '*') interim = a * b;
       else if (op1 === '+') interim = a + b;
@@ -47,29 +45,66 @@ function generateProblem() {
       else answer = interim - c;
     }
 
-    // 条件2: 答えは必ず3桁以上（100以上）
     if (Number.isFinite(answer) && Math.abs(answer) >= 100) {
-      // 正答が負になるケースを避けるため、負なら再生成
       if (answer >= 100) return { question, answer };
     }
-    // 条件を満たさなければ再生成
   }
 }
 
 /**
  * 正解とダミーをシャッフルして返す
+ * ダミーは百の位と一の位を正解と同じにし、十の位のみ別の値にする
  * @param {number} correct
  * @returns {number[]}
  */
 function makeChoices(correct) {
+  // 正答は3桁以上であることが前提
+  const str = String(correct);
+  if (str.length < 3) {
+    // 万一の保険: 3桁未満なら既存ロジックにフォールバック
+    const set = new Set([correct]);
+    while (set.size < 3) {
+      const delta = Math.floor(Math.random() * 101) - 50;
+      const wrong = correct + (delta === 0 ? 1 : delta);
+      if (wrong >= 100) set.add(wrong);
+    }
+    return Array.from(set).sort(() => Math.random() - 0.5);
+  }
+
+  // 百の位と一の位を固定、十の位を変える
+  const hundreds = Math.floor(correct / 100); // 例: 183 -> 1
+  const units = correct % 10; // 例: 183 -> 3
+  const origTens = Math.floor((correct % 100) / 10); // 例: 183 -> 8
+
+  const tensCandidates = [];
+  for (let t = 0; t <= 9; t++) {
+    if (t === origTens) continue;
+    tensCandidates.push(t);
+  }
+
+  // シャッフル tensCandidates
+  for (let i = tensCandidates.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [tensCandidates[i], tensCandidates[j]] = [tensCandidates[j], tensCandidates[i]];
+  }
+
   const set = new Set([correct]);
+  let idx = 0;
+  while (set.size < 3 && idx < tensCandidates.length) {
+    const t = tensCandidates[idx++];
+    const wrong = hundreds * 100 + t * 10 + units;
+    // wrong が正答と重複しないこと、かつ100以上であることを確認
+    if (wrong >= 100 && wrong !== correct) set.add(wrong);
+  }
+
+  // 万一十分なダミーが作れなければ補完（既存ロジックより）
   while (set.size < 3) {
-    // ダミーは正解からのランダムなオフセット（-50〜+50）
     const delta = Math.floor(Math.random() * 101) - 50;
     const wrong = correct + (delta === 0 ? 1 : delta);
-    // ダミーは3桁以上かつ正であることを保証
     if (wrong >= 100) set.add(wrong);
   }
+
+  // ランダムに並べ替えて返す
   return Array.from(set).sort(() => Math.random() - 0.5);
 }
 
@@ -99,7 +134,6 @@ module.exports = {
     const channelId = interaction.channelId;
     const sub = interaction.options.getSubcommand();
 
-    // サブコマンド: stop
     if (sub === 'stop') {
       if (!games.has(channelId)) {
         return interaction.reply({
@@ -115,24 +149,21 @@ module.exports = {
       });
     }
 
-    // サブコマンド: start
     if (games.has(channelId)) {
       return interaction.reply({
         content: 'このチャンネルではすでにゲームが進行中です。',
         ephemeral: true
       });
     }
-    games.set(channelId, null); // 一旦置いておく
+    games.set(channelId, null);
 
     const { question, answer } = generateProblem();
     const choices = makeChoices(answer);
 
-    // 回答管理
     const respondents = new Set();
     const correctRespondents = new Set();
     const wrongRespondents = new Set();
 
-    // 選択肢ボタン（最大3つ）
     const choiceRow = new ActionRowBuilder().addComponents(
       choices.map(num =>
         new ButtonBuilder()
@@ -142,7 +173,6 @@ module.exports = {
       )
     );
 
-    // クイズ開始メッセージ
     const quizMsg = await interaction.reply({
       content:
         '🧮 3分間の三択計算クイズスタート！\n' +
@@ -152,13 +182,11 @@ module.exports = {
       fetchReply: true
     });
 
-    // 3分間のコレクターをセットアップ
     const collector = quizMsg.createMessageComponentCollector({
       componentType: ComponentType.Button,
       time: 3 * 60 * 1000
     });
 
-    // games マップに必要情報を保存
     games.set(channelId, {
       collector,
       quizMsg,
@@ -168,7 +196,6 @@ module.exports = {
       wrongRespondents
     });
 
-    // ボタン押下時の処理
     collector.on('collect', async btnInt => {
       const userId = btnInt.user.id;
       if (respondents.has(userId)) {
@@ -189,7 +216,6 @@ module.exports = {
       }
     });
 
-    // 終了時の処理（タイムアップ or stop）
     collector.on('end', async () => {
       const game = games.get(channelId);
       if (!game) return;
