@@ -10,12 +10,12 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.GuildVoiceStates, // ✅ 通話イベントに必要
+    GatewayIntentBits.GuildVoiceStates,
   ],
 });
 
 //--------------------コマンド登録（開発時のみ）--------------------------
-// require("./deploy-commands.js");
+// require('./deploy-commands.js');
 
 //--------------------スラッシュコマンド読み込み--------------------------
 client.commands = new Collection();
