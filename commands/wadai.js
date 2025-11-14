@@ -4,7 +4,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('topic')
     .setDescription('会話のテーマをランダムで選びます'),
-  async execute(client, interaction) {
+  async execute(interaction) { // ✅ client を削除して interaction のみに統一
     // 会話のテーマ候補
     const themes = [
       '好きなイベントストーリー',

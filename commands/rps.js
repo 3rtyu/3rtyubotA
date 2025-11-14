@@ -4,7 +4,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType
+  ComponentType,
+  MessageFlags
 } = require('discord.js');
 
 const games = new Map(); // channelId → ゲーム情報
@@ -14,10 +15,13 @@ module.exports = {
     .setName('rps')
     .setDescription('2名でじゃんけんを開始します'),
 
-  async execute(client, interaction) {
+  async execute(interaction) { // ✅ client を削除して interaction のみに統一
     const channelId = interaction.channelId;
     if (games.has(channelId)) {
-      return interaction.reply({ content: '既にこのチャンネルではゲームが進行中です。', ephemeral: true });
+      return interaction.reply({
+        content: '既にこのチャンネルではゲームが進行中です。',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     // ゲーム初期化
@@ -46,10 +50,16 @@ module.exports = {
     joinCollector.on('collect', async btnInt => {
       if (btnInt.customId !== 'rps_join') return;
       if (game.players.includes(btnInt.user.id)) {
-        return btnInt.reply({ content: 'あなたは既に参加しています。', ephemeral: true });
+        return btnInt.reply({
+          content: 'あなたは既に参加しています。',
+          flags: MessageFlags.Ephemeral
+        });
       }
       game.players.push(btnInt.user.id);
-      await btnInt.reply({ content: '参加完了！じゃんけんを開始します。', ephemeral: true });
+      await btnInt.reply({
+        content: '参加完了！じゃんけんを開始します。',
+        flags: MessageFlags.Ephemeral
+      });
       joinCollector.stop('ready');
     });
 
@@ -66,7 +76,6 @@ module.exports = {
 
       // 手選び → あいこ時に再帰呼び出し
       async function playRound() {
-        // ボタン列
         const pickRow = new ActionRowBuilder().addComponents(
           new ButtonBuilder()
             .setCustomId('rps_select_rock')
@@ -82,7 +91,6 @@ module.exports = {
             .setStyle(ButtonStyle.Secondary)
         );
 
-        // メッセージ更新
         await joinMessage.edit({
           content: game.picks && Object.keys(game.picks).length === 2
             ? 'あいこです！再度手を選んでください。'
@@ -90,10 +98,8 @@ module.exports = {
           components: [pickRow]
         });
 
-        // 既選択リセット
         game.picks = {};
 
-        // 収集器
         const pickCollector = joinMessage.createMessageComponentCollector({
           componentType: ComponentType.Button,
           time: 30000
@@ -102,7 +108,10 @@ module.exports = {
         pickCollector.on('collect', async pickInt => {
           if (!game.players.includes(pickInt.user.id)) return;
           if (game.picks[pickInt.user.id]) {
-            return pickInt.reply({ content: 'あなたは既に選択済みです。', ephemeral: true });
+            return pickInt.reply({
+              content: 'あなたは既に選択済みです。',
+              flags: MessageFlags.Ephemeral
+            });
           }
 
           const choiceMap = {
@@ -114,7 +123,10 @@ module.exports = {
           if (!choice) return;
 
           game.picks[pickInt.user.id] = choice;
-          await pickInt.reply({ content: `あなたの手: ${choice}`, ephemeral: true });
+          await pickInt.reply({
+            content: `あなたの手: ${choice}`,
+            flags: MessageFlags.Ephemeral
+          });
 
           if (Object.keys(game.picks).length === 2) {
             pickCollector.stop('done');
@@ -127,14 +139,11 @@ module.exports = {
             const c1 = game.picks[p1] || '―';
             const c2 = game.picks[p2] || '―';
 
-            // 引き分け判定
             if (c1 === c2) {
-              // あいこなら再挑戦
               await joinMessage.edit({ components: [] });
               return resolve(playRound());
             }
 
-            // 勝敗判定
             let resultText;
             if (
               (c1 === 'グー' && c2 === 'チョキ') ||
@@ -146,7 +155,6 @@ module.exports = {
               resultText = `<@${p2}> の勝ち！`;
             }
 
-            // 結果表示
             await joinMessage.edit({
               content:
                 `結果発表！\n` +
@@ -161,7 +169,6 @@ module.exports = {
         });
       }
 
-      // 最初のラウンド開始
       await playRound();
     });
   }

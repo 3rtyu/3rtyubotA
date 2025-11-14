@@ -1,5 +1,5 @@
-// commands/kurohige_reaction.js
-const { SlashCommandBuilder } = require('discord.js');
+// commands/kurohige.js
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 
 const numberEmojis = ['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
 const emojiToNumber = {
@@ -14,10 +14,13 @@ module.exports = {
     .setName('kurohige')
     .setDescription('黒ひげ危機一髪風ゲームを開始します！'),
 
-  async execute(client, interaction) {
+  async execute(interaction) { // ✅ client を削除して interaction のみ
     const channelId = interaction.channelId;
     if (games.has(channelId)) {
-      return interaction.reply({ content: 'このチャンネルでは既にゲームが進行中です。', ephemeral: true });
+      return interaction.reply({
+        content: 'このチャンネルでは既にゲームが進行中です。',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     const game = {
@@ -111,7 +114,6 @@ async function startTurn(msg, game, channelId) {
       console.error('リアクション削除失敗:', err);
     }
 
-    // 前ターンのセーフ・次ターンメッセージ削除
     if (game.lastSafeMsg) {
       try { await game.lastSafeMsg.delete(); } catch (e) {}
       game.lastSafeMsg = null;

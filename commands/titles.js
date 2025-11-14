@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -14,7 +14,10 @@ module.exports = {
       titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
     } catch (err) {
       console.error('titles.json の読み込みに失敗しました:', err);
-      return interaction.reply({ content: '称号一覧の取得に失敗しました。', ephemeral: true });
+      return interaction.reply({
+        content: '称号一覧の取得に失敗しました。',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     const embed = new EmbedBuilder()
@@ -30,6 +33,9 @@ module.exports = {
       });
     }
 
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({
+      embeds: [embed],
+      flags: MessageFlags.Ephemeral
+    });
   }
 };

@@ -4,7 +4,7 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('omikuji')
     .setDescription('ランダムでおみくじを引きます'),
-  async execute(client, interaction) {
+  async execute(interaction) { // ✅ client を削除して interaction のみに統一
     // おみくじ結果と色のマッピング（16進数カラーコード）
     const fortunes = [
       '大吉',
@@ -40,4 +40,3 @@ module.exports = {
     await interaction.reply({ embeds: [embed], ephemeral: false });
   },
 };
-

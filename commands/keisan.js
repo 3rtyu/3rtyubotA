@@ -3,7 +3,8 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
   ButtonStyle,
-  ComponentType
+  ComponentType,
+  MessageFlags
 } = require('discord.js');
 
 const games = new Map();
@@ -53,15 +54,10 @@ function generateProblem() {
 
 /**
  * 正解とダミーをシャッフルして返す
- * ダミーは百の位と一の位を正解と同じにし、十の位のみ別の値にする
- * @param {number} correct
- * @returns {number[]}
  */
 function makeChoices(correct) {
-  // 正答は3桁以上であることが前提
   const str = String(correct);
   if (str.length < 3) {
-    // 万一の保険: 3桁未満なら既存ロジックにフォールバック
     const set = new Set([correct]);
     while (set.size < 3) {
       const delta = Math.floor(Math.random() * 101) - 50;
@@ -71,10 +67,9 @@ function makeChoices(correct) {
     return Array.from(set).sort(() => Math.random() - 0.5);
   }
 
-  // 百の位と一の位を固定、十の位を変える
-  const hundreds = Math.floor(correct / 100); // 例: 183 -> 1
-  const units = correct % 10; // 例: 183 -> 3
-  const origTens = Math.floor((correct % 100) / 10); // 例: 183 -> 8
+  const hundreds = Math.floor(correct / 100);
+  const units = correct % 10;
+  const origTens = Math.floor((correct % 100) / 10);
 
   const tensCandidates = [];
   for (let t = 0; t <= 9; t++) {
@@ -82,7 +77,6 @@ function makeChoices(correct) {
     tensCandidates.push(t);
   }
 
-  // シャッフル tensCandidates
   for (let i = tensCandidates.length - 1; i > 0; i--) {
     const j = Math.floor(Math.random() * (i + 1));
     [tensCandidates[i], tensCandidates[j]] = [tensCandidates[j], tensCandidates[i]];
@@ -93,18 +87,15 @@ function makeChoices(correct) {
   while (set.size < 3 && idx < tensCandidates.length) {
     const t = tensCandidates[idx++];
     const wrong = hundreds * 100 + t * 10 + units;
-    // wrong が正答と重複しないこと、かつ100以上であることを確認
     if (wrong >= 100 && wrong !== correct) set.add(wrong);
   }
 
-  // 万一十分なダミーが作れなければ補完（既存ロジックより）
   while (set.size < 3) {
     const delta = Math.floor(Math.random() * 101) - 50;
     const wrong = correct + (delta === 0 ? 1 : delta);
     if (wrong >= 100) set.add(wrong);
   }
 
-  // ランダムに並べ替えて返す
   return Array.from(set).sort(() => Math.random() - 0.5);
 }
 
@@ -130,7 +121,7 @@ module.exports = {
       sub.setName('stop').setDescription('ゲームを途中で終了する')
     ),
 
-  async execute(client, interaction) {
+  async execute(interaction) { // ✅ client を削除して interaction のみ
     const channelId = interaction.channelId;
     const sub = interaction.options.getSubcommand();
 
@@ -138,21 +129,21 @@ module.exports = {
       if (!games.has(channelId)) {
         return interaction.reply({
           content: '進行中のゲームがありません。',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
       const game = games.get(channelId);
       if (game && game.collector) game.collector.stop('manual');
       return interaction.reply({
         content: 'ゲームを停止しました。',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
 
     if (games.has(channelId)) {
       return interaction.reply({
         content: 'このチャンネルではすでにゲームが進行中です。',
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
     }
     games.set(channelId, null);
@@ -201,7 +192,7 @@ module.exports = {
       if (respondents.has(userId)) {
         return btnInt.reply({
           content: 'すでに回答済みです。',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
       respondents.add(userId);

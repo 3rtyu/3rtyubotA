@@ -14,9 +14,6 @@ const client = new Client({
   ],
 });
 
-//--------------------コマンド登録（開発時のみ）--------------------------
-// require('./deploy-commands.js');
-
 //--------------------スラッシュコマンド読み込み--------------------------
 client.commands = new Collection();
 const commandsPath = path.join(__dirname, 'commands');
@@ -38,7 +35,7 @@ for (const file of eventFiles) {
   if (event.once) {
     client.once(event.name, (...args) => {
       if (event.name === 'interactionCreate') {
-        event.execute(...args); // interaction のみ渡す
+        event.execute(...args); // ✅ interaction のみ渡す
       } else {
         event.execute(client, ...args);
       }
@@ -46,7 +43,7 @@ for (const file of eventFiles) {
   } else {
     client.on(event.name, (...args) => {
       if (event.name === 'interactionCreate') {
-        event.execute(...args); // interaction のみ渡す
+        event.execute(...args); // ✅ interaction のみ渡す
       } else {
         event.execute(client, ...args);
       }
@@ -67,13 +64,21 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 
   try {
-    await command.execute(client, interaction);
+    // ✅ interaction のみ渡す
+    await command.execute(interaction);
   } catch (error) {
     console.error(error);
-    await interaction.reply({
-      content: 'コマンド実行中にエラーが発生しました',
-      flags: MessageFlags.Ephemeral
-    });
+    if (!interaction.replied) {
+      await interaction.reply({
+        content: 'コマンド実行中にエラーが発生しました',
+        flags: MessageFlags.Ephemeral
+      });
+    } else {
+      await interaction.followUp({
+        content: 'コマンド実行中にエラーが発生しました',
+        flags: MessageFlags.Ephemeral
+      });
+    }
   }
 });
 

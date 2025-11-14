@@ -1,4 +1,4 @@
-const { SlashCommandBuilder } = require('discord.js');
+const { SlashCommandBuilder, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -15,13 +15,16 @@ module.exports = {
       balances = JSON.parse(fs.readFileSync(balancesPath, 'utf8'));
     } catch (err) {
       console.error('残高ファイルの読み込みに失敗しました:', err);
-      return interaction.reply({ content: '残高情報の取得に失敗しました。', ephemeral: true });
+      return interaction.reply({
+        content: '残高情報の取得に失敗しました。',
+        flags: MessageFlags.Ephemeral
+      });
     }
 
     const balance = balances[userId] || 0;
     await interaction.reply({
       content: `🌿 ${interaction.user.username} さんの所持はっぱ：**${balance} はっぱ**`,
-      ephemeral: true
+      flags: MessageFlags.Ephemeral
     });
   }
 };
