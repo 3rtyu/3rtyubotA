@@ -3,7 +3,7 @@ const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('1d100')
-    .setDescription('100面ダイスを振ります（結果のみ表示）'),
+    .setDescription('100面ダイスを振ります'),
 
   async execute(client, interaction) {
     // ダイスの結果（1〜100）

@@ -1,4 +1,3 @@
-// main.js
 const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
 const client = new Client({
   intents: [
@@ -7,7 +6,7 @@ const client = new Client({
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildVoiceStates, // ✅ 通話イベントに必要
   ],
 });
 
@@ -20,7 +19,6 @@ const path = require('node:path');
 require("./deploy-commands.js");
 
 //--------------------コマンドを読み込む--------------------------
-// スラッシュコマンド
 client.commands = new Collection();
 const slashcommandsPath = path.join(__dirname, 'commands');
 const slashcommandFiles = fs
@@ -42,7 +40,7 @@ const eventsFiles = fs
 for (const file of eventsFiles) {
   const event = require(path.join(eventsPath, file));
 
-  // ↓ client を渡すように修正 ↓
+  // ✅ voiceStateUpdateイベントにも対応（clientを渡す）
   if (event.once) {
     client.once(event.name, (...args) => event.execute(client, ...args));
   } else {
@@ -52,7 +50,7 @@ for (const file of eventsFiles) {
   console.log(`-> [Loaded Event] ${file.split('.')[0]}`);
 }
 
-// スラッシュコマンド実行時のハンドラ
+//--------------------スラッシュコマンド実行時のハンドラ--------------------------
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
@@ -63,7 +61,6 @@ client.on(Events.InteractionCreate, async interaction => {
   }
 
   try {
-    // こちらはもともと client, interaction を正しく渡しています
     await command.execute(client, interaction);
   } catch (error) {
     console.error(error);

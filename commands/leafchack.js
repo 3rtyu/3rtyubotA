@@ -1,0 +1,27 @@
+const { SlashCommandBuilder } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('leafchack')
+    .setDescription('自分の所持しているはっぱの数を表示します'),
+  async execute(interaction) {
+    const userId = interaction.user.id;
+    const balancesPath = path.join(__dirname, '../balances.json');
+
+    let balances = {};
+    try {
+      balances = JSON.parse(fs.readFileSync(balancesPath, 'utf8'));
+    } catch (err) {
+      console.error('残高ファイルの読み込みに失敗しました:', err);
+      return interaction.reply({ content: '残高情報の取得に失敗しました。', ephemeral: true });
+    }
+
+    const balance = balances[userId] || 0;
+    await interaction.reply({
+      content: `🌿 ${interaction.user.username} さんの所持はっぱ：**${balance} はっぱ**`,
+      ephemeral: true
+    });
+  }
+};
