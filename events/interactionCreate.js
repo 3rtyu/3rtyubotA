@@ -1,4 +1,7 @@
-const { EmbedBuilder } = require('discord.js');
+const {
+  EmbedBuilder,
+  MessageFlags
+} = require('discord.js');
 const { pullMany, colorMap, roleNames } = require('../utils/gacha');
 const { getBalance, addBalance } = require('../utils/currency');
 const fs = require('fs');
@@ -9,7 +12,7 @@ const titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
 
 module.exports = {
   name: 'interactionCreate',
-  async execute(client, interaction) {
+  async execute(interaction) {
     if (!interaction.isButton()) return;
 
     const userId = interaction.user.id;
@@ -17,7 +20,7 @@ module.exports = {
     // 🎰 ガチャ処理
     if (['gacha_one', 'gacha_ten'].includes(interaction.customId)) {
       const count = interaction.customId === 'gacha_ten' ? 10 : 1;
-      await interaction.deferReply({ ephemeral: true });
+      await interaction.deferReply({ flags: MessageFlags.Ephemeral });
 
       const results = pullMany(count);
       const lines = results.map((r, i) => `\`${i + 1}.\` ${r.rarity} **${r.item}**`);
@@ -52,13 +55,16 @@ module.exports = {
 
       const uniqueR = [...new Set(results.map(r => r.rarity))];
       for (const rarity of uniqueR) {
-        const role = interaction.guild.roles.cache
-          .find(r => r.name === roleNames[rarity]);
-        if (!role) continue;
-        try {
-          await interaction.member.roles.add(role);
-        } catch (err) {
-          console.error('ロール付与エラー:', err);
+        const roleName = roleNames[rarity];
+        if (!roleName) continue;
+
+        const role = interaction.guild.roles.cache.find(r => r.name === roleName);
+        if (role && !interaction.member.roles.cache.has(role.id)) {
+          try {
+            await interaction.member.roles.add(role);
+          } catch (err) {
+            console.error('ロール付与エラー:', err);
+          }
         }
       }
 
@@ -73,7 +79,7 @@ module.exports = {
       if (!item) {
         return interaction.reply({
           content: 'そのアイテムは存在しません。',
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
@@ -81,17 +87,16 @@ module.exports = {
       if (balance < item.cost) {
         return interaction.reply({
           content: `はっぱが足りません（必要: ${item.cost}）`,
-          ephemeral: true
+          flags: MessageFlags.Ephemeral
         });
       }
 
       addBalance(userId, -item.cost);
       await interaction.reply({
         content: `🎖️ ${item.role} を購入しました！（-${item.cost} はっぱ）`,
-        ephemeral: true
+        flags: MessageFlags.Ephemeral
       });
 
-      // ロール付与（必要なら）
       const role = interaction.guild.roles.cache.find(r => r.name === item.role);
       if (role && !interaction.member.roles.cache.has(role.id)) {
         try {
