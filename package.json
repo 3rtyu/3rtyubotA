@@ -1,7 +1,7 @@
 {
   "name": "discord-bot-template",
   "scripts": {
-    "start": "node server.js"
+    "start": "node main.js"
   },
   "dependencies": {
     "discord.js": "^14.18.0",
