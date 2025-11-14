@@ -71,7 +71,7 @@ module.exports = {
       return;
     }
 
-    // 🏪 ショップ購入処理（titles.json を使用）
+    // 🏪 ショップ購入処理
     if (interaction.customId.startsWith('buy_')) {
       const key = interaction.customId.replace('buy_', '');
       const item = titles[key];
@@ -108,7 +108,5 @@ module.exports = {
 
       return;
     }
-
-    // それ以外のボタンは無視
   }
 };
