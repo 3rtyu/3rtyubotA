@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { SlashCommandBuilder, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageFlags } = require('discord.js');
 const fs = require('fs');
 const path = require('path');
 
@@ -12,22 +12,36 @@ module.exports = {
   async execute(interaction) {
     const embed = new EmbedBuilder()
       .setTitle('🏪 はっぱショップ')
-      .setDescription('はっぱを使用して称号を購入できるぜ')
+      .setDescription('はっぱを使用して称号を購入できます')
       .setColor(0x00AE86);
 
-    const row = new ActionRowBuilder();
+    const rows = [];
+    let currentRow = new ActionRowBuilder();
 
     for (const [key, item] of Object.entries(titles)) {
       embed.addFields({ name: item.role, value: `価格: ${item.cost} はっぱ`, inline: true });
-      row.addComponents(
+
+      if (currentRow.components.length === 5) {
+        rows.push(currentRow);
+        currentRow = new ActionRowBuilder();
+      }
+
+      currentRow.addComponents(
         new ButtonBuilder()
           .setCustomId(`buy_${key}`)
           .setLabel(item.role)
           .setStyle(ButtonStyle.Primary)
       );
     }
+    rows.push(currentRow);
 
-    await interaction.channel.send({ embeds: [embed], components: [row] });
-    await interaction.reply({ content: 'ショップを設置しました', ephemeral: true });
+    if (interaction.channel) {
+      await interaction.channel.send({ embeds: [embed], components: rows });
+    }
+
+    await interaction.reply({
+      content: 'ショップを設置しました',
+      flags: MessageFlags.Ephemeral
+    });
   },
 };
