@@ -1,4 +1,8 @@
-const { Client, Collection, Events, GatewayIntentBits } = require('discord.js');
+const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
+const fs = require('node:fs');
+const path = require('node:path');
+require('dotenv').config();
+
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
@@ -10,41 +14,43 @@ const client = new Client({
   ],
 });
 
-require('dotenv').config();
-const fs = require('node:fs');
-const path = require('node:path');
+//--------------------コマンド登録（開発時のみ）--------------------------
+// require("./deploy-commands.js");
 
-//-----------commands------------
-
-require("./deploy-commands.js");
-
-//--------------------コマンドを読み込む--------------------------
+//--------------------スラッシュコマンド読み込み--------------------------
 client.commands = new Collection();
-const slashcommandsPath = path.join(__dirname, 'commands');
-const slashcommandFiles = fs
-  .readdirSync(slashcommandsPath)
-  .filter(file => file.endsWith('.js'));
+const commandsPath = path.join(__dirname, 'commands');
+const commandFiles = fs.readdirSync(commandsPath).filter(file => file.endsWith('.js'));
 
-for (const file of slashcommandFiles) {
-  const command = require(path.join(slashcommandsPath, file));
+for (const file of commandFiles) {
+  const command = require(path.join(commandsPath, file));
   console.log(`-> [Loaded Command] ${file.split('.')[0]}`);
   client.commands.set(command.data.name, command);
 }
 
-//--------------------イベントを読み込む--------------------------
+//--------------------イベント読み込み--------------------------
 const eventsPath = path.join(__dirname, 'events');
-const eventsFiles = fs
-  .readdirSync(eventsPath)
-  .filter(file => file.endsWith('.js'));
+const eventFiles = fs.readdirSync(eventsPath).filter(file => file.endsWith('.js'));
 
-for (const file of eventsFiles) {
+for (const file of eventFiles) {
   const event = require(path.join(eventsPath, file));
 
-  // ✅ voiceStateUpdateイベントにも対応（clientを渡す）
   if (event.once) {
-    client.once(event.name, (...args) => event.execute(client, ...args));
+    client.once(event.name, (...args) => {
+      if (event.name === 'interactionCreate') {
+        event.execute(...args); // interaction のみ渡す
+      } else {
+        event.execute(client, ...args);
+      }
+    });
   } else {
-    client.on(event.name, (...args) => event.execute(client, ...args));
+    client.on(event.name, (...args) => {
+      if (event.name === 'interactionCreate') {
+        event.execute(...args); // interaction のみ渡す
+      } else {
+        event.execute(client, ...args);
+      }
+    });
   }
 
   console.log(`-> [Loaded Event] ${file.split('.')[0]}`);
@@ -54,7 +60,7 @@ for (const file of eventsFiles) {
 client.on(Events.InteractionCreate, async interaction => {
   if (!interaction.isChatInputCommand()) return;
 
-  const command = interaction.client.commands.get(interaction.commandName);
+  const command = client.commands.get(interaction.commandName);
   if (!command) {
     console.error(`No command matching ${interaction.commandName} was found.`);
     return;
@@ -64,7 +70,10 @@ client.on(Events.InteractionCreate, async interaction => {
     await command.execute(client, interaction);
   } catch (error) {
     console.error(error);
-    await interaction.reply({ content: 'コマンド実行中にエラーが発生しました', ephemeral: true });
+    await interaction.reply({
+      content: 'コマンド実行中にエラーが発生しました',
+      flags: MessageFlags.Ephemeral
+    });
   }
 });
 
