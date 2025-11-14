@@ -1,8 +1,8 @@
 const { getBalance, addBalance } = require('../utils/currency');
 
 const SHOP_ITEMS = {
-  buy_vip: { roleId: 'ROLE_ID_lifeendS', cost: 100, name: '人生終了初級' },
-  buy_champion: { roleId: 'ROLE_ID_lifeendL', cost: 200, name: '人生終了上級' }
+  buy_lifeendS: { roleId: 'ROLE_ID_lifeendS', cost: 100, name: '人生終了初級' },
+  buy_lifeendL: { roleId: 'ROLE_ID_lifeendL', cost: 200, name: '人生終了上級' }
 };
 
 module.exports = async (interaction) => {
