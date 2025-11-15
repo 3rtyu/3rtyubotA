@@ -84,3 +84,13 @@ client.on(Events.InteractionCreate, async interaction => {
 });
 
 client.login(process.env.TOKEN);
+
+//--------------------Render用ダミーサーバー（ポート監視対策）--------------------------
+const express = require('express');
+const app = express();
+
+app.get('/', (req, res) => res.send('Bot is running'));
+
+app.listen(process.env.PORT || 3000, () => {
+  console.log(`Express server is running on port ${process.env.PORT || 3000}`);
+});
