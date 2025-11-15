@@ -35,7 +35,7 @@ for (const file of eventFiles) {
   if (event.once) {
     client.once(event.name, (...args) => {
       if (event.name === 'interactionCreate') {
-        event.execute(...args); // ✅ interaction のみ渡す
+        event.execute(...args);
       } else {
         event.execute(client, ...args);
       }
@@ -43,7 +43,7 @@ for (const file of eventFiles) {
   } else {
     client.on(event.name, (...args) => {
       if (event.name === 'interactionCreate') {
-        event.execute(...args); // ✅ interaction のみ渡す
+        event.execute(...args);
       } else {
         event.execute(client, ...args);
       }
@@ -53,19 +53,20 @@ for (const file of eventFiles) {
   console.log(`-> [Loaded Event] ${file.split('.')[0]}`);
 }
 
-//--------------------スラッシュコマンド実行時のハンドラ--------------------------
+//--------------------インタラクション実行時のハンドラ--------------------------
 client.on(Events.InteractionCreate, async interaction => {
-  if (!interaction.isChatInputCommand()) return;
-
-  const command = client.commands.get(interaction.commandName);
-  if (!command) {
-    console.error(`No command matching ${interaction.commandName} was found.`);
-    return;
-  }
-
   try {
-    // ✅ interaction のみ渡す
-    await command.execute(interaction);
+    if (interaction.isChatInputCommand()) {
+      const command = client.commands.get(interaction.commandName);
+      if (!command) {
+        console.error(`No command matching ${interaction.commandName} was found.`);
+        return;
+      }
+      await command.execute(interaction);
+    } else if (interaction.isButton()) {
+      const handler = require('./interactions/shopButtons.js');
+      await handler(interaction);
+    }
   } catch (error) {
     console.error(error);
     if (!interaction.replied) {
