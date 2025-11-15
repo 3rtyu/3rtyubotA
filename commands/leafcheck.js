@@ -4,7 +4,7 @@ const path = require('path');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('leafchack')
+    .setName('leafcheck')
     .setDescription('自分の所持しているはっぱの数を表示します'),
   async execute(interaction) {
     const userId = interaction.user.id;

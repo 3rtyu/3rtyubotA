@@ -9,14 +9,23 @@ const {
 const fs = require('fs');
 const path = require('path');
 
-const titlesPath = path.join(__dirname, '../data/titles.json');
-const titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
-
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('deploy-leafshop')
     .setDescription('ショップ埋め込みを送信します（管理者専用）'),
   async execute(interaction) {
+    const titlesPath = path.join(__dirname, '../data/titles.json');
+    let titles = {};
+    try {
+      titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
+    } catch (err) {
+      console.error('titles.json の読み込みに失敗しました:', err);
+      return interaction.reply({
+        content: '称号データの読み込みに失敗しました。',
+        flags: MessageFlags.Ephemeral
+      });
+    }
+
     const embed = new EmbedBuilder()
       .setTitle('🏪 はっぱショップ')
       .setDescription('はっぱを使用して称号を購入できます')
@@ -40,7 +49,9 @@ module.exports = {
           .setStyle(ButtonStyle.Primary)
       );
     }
-    rows.push(currentRow);
+    if (currentRow.components.length > 0) {
+      rows.push(currentRow);
+    }
 
     if (interaction.channel) {
       await interaction.channel.send({ embeds: [embed], components: rows });
