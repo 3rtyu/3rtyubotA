@@ -1,13 +1,15 @@
 const fs = require('fs');
-const path = './balances.json';
+const path = require('path');
+
+const balancesPath = path.join(__dirname, '../data/balances.json');
 
 function loadBalances() {
-  if (!fs.existsSync(path)) return {};
-  return JSON.parse(fs.readFileSync(path));
+  if (!fs.existsSync(balancesPath)) return {};
+  return JSON.parse(fs.readFileSync(balancesPath, 'utf8'));
 }
 
 function saveBalances(balances) {
-  fs.writeFileSync(path, JSON.stringify(balances, null, 2));
+  fs.writeFileSync(balancesPath, JSON.stringify(balances, null, 2));
 }
 
 function getBalance(userId) {

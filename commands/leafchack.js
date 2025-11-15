@@ -8,7 +8,7 @@ module.exports = {
     .setDescription('自分の所持しているはっぱの数を表示します'),
   async execute(interaction) {
     const userId = interaction.user.id;
-    const balancesPath = path.join(__dirname, '../balances.json');
+    const balancesPath = path.join(__dirname, '../data/balances.json'); // ✅ 修正
 
     let balances = {};
     try {
