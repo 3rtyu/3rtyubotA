@@ -5,14 +5,14 @@ const joinTimes = new Map();
 
 module.exports = {
   name: 'voiceStateUpdate',
-  async execute(oldState, newState) {
+  async execute(client, oldState, newState) {
     const userId = newState.member?.user?.id || oldState.member?.user?.id;
     if (!userId) return;
 
     const oldChannel = oldState.channelId;
     const newChannel = newState.channelId;
 
-    // AFKに移動した場合は記録を削除（最優先）
+    // AFKに移動した場合は記録を削除
     if (newChannel === AFK_CHANNEL_ID) {
       joinTimes.delete(userId);
       console.log(`${userId} が AFK に移動しました`);
