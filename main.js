@@ -68,6 +68,12 @@ client.on(Events.InteractionCreate, async interaction => {
       const command = client.commands.get(interaction.commandName);
       if (!command) {
         console.error(`No command matching ${interaction.commandName} was found.`);
+        if (!interaction.replied && !interaction.deferred) {
+          await interaction.reply({
+            content: 'そのコマンドは存在しません。',
+            ephemeral: true
+          });
+        }
         return;
       }
       await command.execute(interaction);
@@ -75,7 +81,7 @@ client.on(Events.InteractionCreate, async interaction => {
   } catch (error) {
     console.error('Interaction handler error:', error);
     try {
-      if (!interaction.replied) {
+      if (!interaction.replied && !interaction.deferred) {
         await interaction.reply({
           content: 'コマンド実行中にエラーが発生しました',
           flags: MessageFlags.Ephemeral
@@ -147,6 +153,7 @@ const app = express();
 
 app.get('/', (req, res) => res.send('Bot is running'));
 
-app.listen(process.env.PORT || 3000, () => {
-  console.log(`Express server is running on port ${process.env.PORT || 3000}`);
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Express server is running on port ${PORT}`);
 });
