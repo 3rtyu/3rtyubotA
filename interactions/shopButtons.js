@@ -51,7 +51,11 @@ module.exports = async (interaction) => {
   } catch (err) {
     console.error('shopButtons.js エラー:', err);
     try {
-      await interaction.editReply({ content: '内部エラーが発生しました。' });
+      if (!interaction.replied && !interaction.deferred) {
+        await interaction.reply({ content: '内部エラーが発生しました。', ephemeral: true });
+      } else {
+        await interaction.editReply({ content: '内部エラーが発生しました。' });
+      }
     } catch (e) {
       console.error('エラー応答に失敗:', e);
     }
