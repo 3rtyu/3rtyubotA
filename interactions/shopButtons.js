@@ -1,3 +1,9 @@
+const { getBalance, addBalance } = require('../utils/currency');
+const fs = require('fs');
+const path = require('path');
+
+const titlesPath = path.join(__dirname, '../data/titles.json');
+
 module.exports = async (interaction) => {
   if (!interaction.isButton()) {
     console.debug('shopButtons.js に非ボタンインタラクションが渡されました');
@@ -5,7 +11,7 @@ module.exports = async (interaction) => {
   }
 
   try {
-    // ✅ deferReply を try-catch で囲む
+    // ✅ deferReply を安全に呼び出す
     try {
       if (!interaction.deferred && !interaction.replied) {
         await interaction.deferReply({ ephemeral: true });
@@ -15,8 +21,16 @@ module.exports = async (interaction) => {
       return;
     }
 
-    // 以下はそのまま
-    const titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
+    // ✅ titles.json の読み込み
+    let titles;
+    try {
+      titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
+    } catch (readErr) {
+      console.error('titles.json の読み込みに失敗:', readErr);
+      await interaction.editReply({ content: '称号データの読み込みに失敗しました。' });
+      return;
+    }
+
     const key = interaction.customId.replace('buy_', '');
     const item = titles[key];
 
