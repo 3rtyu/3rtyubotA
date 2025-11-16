@@ -53,7 +53,7 @@ for (const file of eventFiles) {
   console.log(`-> [Loaded Event] ${file.split('.')[0]}`);
 }
 
-//--------------------インタラクション実行時のハンドラ--------------------------
+//--------------------スラッシュコマンド実行時のハンドラ--------------------------
 client.on(Events.InteractionCreate, async interaction => {
   try {
     if (interaction.isChatInputCommand()) {
@@ -63,23 +63,73 @@ client.on(Events.InteractionCreate, async interaction => {
         return;
       }
       await command.execute(interaction);
-    } else if (interaction.isButton()) {
-      const handler = require('./interactions/shopButtons.js');
-      await handler(interaction);
     }
+    // ✅ ボタン処理は interactionCreate.js に任せるため削除済み
   } catch (error) {
-    console.error(error);
-    if (!interaction.replied) {
-      await interaction.reply({
-        content: 'コマンド実行中にエラーが発生しました',
-        flags: MessageFlags.Ephemeral
-      });
-    } else {
-      await interaction.followUp({
-        content: 'コマンド実行中にエラーが発生しました',
-        flags: MessageFlags.Ephemeral
-      });
+    console.error('Interaction handler error:', error);
+    try {
+      if (!interaction.replied) {
+        await interaction.reply({
+          content: 'コマンド実行中にエラーが発生しました',
+          flags: MessageFlags.Ephemeral
+        });
+      } else {
+        await interaction.followUp({
+          content: 'コマンド実行中にエラーが発生しました',
+          flags: MessageFlags.Ephemeral
+        });
+      }
+    } catch (e) {
+      console.error('エラー応答に失敗:', e);
     }
+  }
+});
+
+//--------------------グローバルエラーハンドラ（致命度判定付き）--------------------------
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection:', reason);
+
+  // 致命的エラー判定
+  const fatalPatterns = [
+    'ECONNREFUSED', // 接続拒否
+    'EADDRINUSE',   // ポート競合
+    'RangeError: Maximum call stack size exceeded', // スタックオーバーフロー
+    'SyntaxError',  // コード構文エラー
+    'DiscordAPIError: Missing Access' // Discord権限エラー
+  ];
+
+  const isFatal = fatalPatterns.some(pattern =>
+    reason && reason.toString().includes(pattern)
+  );
+
+  if (isFatal) {
+    console.error('致命的なエラーのため、プロセスを終了します');
+    process.exit(1); // Renderなどの環境では自動再起動される
+  } else {
+    console.warn('非致命的なエラー。Botは継続します');
+  }
+});
+
+process.on('uncaughtException', err => {
+  console.error('Uncaught Exception:', err);
+
+  const fatalPatterns = [
+    'ECONNREFUSED',
+    'EADDRINUSE',
+    'RangeError: Maximum call stack size exceeded',
+    'SyntaxError',
+    'DiscordAPIError: Missing Access'
+  ];
+
+  const isFatal = fatalPatterns.some(pattern =>
+    err && err.toString().includes(pattern)
+  );
+
+  if (isFatal) {
+    console.error('致命的な例外のため、プロセスを終了します');
+    process.exit(1);
+  } else {
+    console.warn('非致命的な例外。Botは継続します');
   }
 });
 
