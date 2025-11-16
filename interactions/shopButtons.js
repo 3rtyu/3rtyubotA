@@ -30,8 +30,9 @@ module.exports = async (interaction) => {
       return;
     }
 
+    const guildId = interaction.guildId;
     const userId = interaction.user.id;
-    const balance = getBalance(userId);
+    const balance = await getBalance(guildId, userId); // ✅ MongoDBから取得
 
     if (balance < item.cost) {
       await interaction.editReply({
@@ -40,7 +41,7 @@ module.exports = async (interaction) => {
       return;
     }
 
-    addBalance(userId, -item.cost);
+    await addBalance(guildId, userId, -item.cost); // ✅ MongoDBに保存
 
     const role = interaction.guild.roles.cache.find(r => r.name === item.role);
     if (role) {

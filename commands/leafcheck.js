@@ -1,30 +1,27 @@
 const { SlashCommandBuilder, MessageFlags } = require('discord.js');
-const fs = require('fs');
-const path = require('path');
+const { getBalance } = require('../currencyManager'); // MongoDB操作関数を読み込み
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('leafcheck')
     .setDescription('自分の所持しているはっぱの数を表示します'),
   async execute(interaction) {
-    const userId = interaction.user.id;
-    const balancesPath = path.join(__dirname, '../data/balances.json'); // ✅ 修正
-
-    let balances = {};
     try {
-      balances = JSON.parse(fs.readFileSync(balancesPath, 'utf8'));
-    } catch (err) {
-      console.error('残高ファイルの読み込みに失敗しました:', err);
-      return interaction.reply({
+      const userId = interaction.user.id;
+      const guildId = interaction.guildId;
+
+      const balance = await getBalance(guildId, userId);
+
+      await interaction.reply({
+        content: `🌿 ${interaction.user.username} さんの所持はっぱ：**${balance} はっぱ**`,
+        flags: MessageFlags.Ephemeral
+      });
+    } catch (error) {
+      console.error('MongoDBからの残高取得に失敗しました:', error);
+      await interaction.reply({
         content: '残高情報の取得に失敗しました。',
         flags: MessageFlags.Ephemeral
       });
     }
-
-    const balance = balances[userId] || 0;
-    await interaction.reply({
-      content: `🌿 ${interaction.user.username} さんの所持はっぱ：**${balance} はっぱ**`,
-      flags: MessageFlags.Ephemeral
-    });
   }
 };

@@ -6,8 +6,10 @@ const joinTimes = new Map();
 module.exports = {
   name: 'voiceStateUpdate',
   async execute(client, oldState, newState) {
-    const userId = newState.member?.user?.id || oldState.member?.user?.id;
-    if (!userId) return;
+    const member = newState.member || oldState.member;
+    const userId = member?.user?.id;
+    const guildId = member?.guild?.id;
+    if (!userId || !guildId) return;
 
     const oldChannel = oldState.channelId;
     const newChannel = newState.channelId;
@@ -36,15 +38,18 @@ module.exports = {
         const earned = durationMinutes;
 
         if (earned > 0) {
-          addBalance(userId, earned);
-          console.log(`${userId} が ${earned} はっぱを獲得しました！`);
+          try {
+            await addBalance(guildId, userId, earned);
+            console.log(`${userId} が ${earned} はっぱを獲得しました！`);
+          } catch (err) {
+            console.error(`はっぱ加算に失敗しました (${userId}):`, err);
+          }
         }
 
         joinTimes.delete(userId);
       } else {
         console.log(`[DEBUG] joinTimes に記録がないため、はっぱ獲得なし: ${userId}`);
       }
-      return;
     }
   }
 };

@@ -1,10 +1,15 @@
 // Node.js バージョン確認用ログ
 console.log("Running Node.js version:", process.version);
 
+require('dotenv').config(); // 環境変数読み込み
+
+// MongoDB 接続処理の読み込みと実行
+const connectDB = require('./connectDB');
+connectDB(); // Bot起動前にMongoDBへ接続
+
 const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
-require('dotenv').config();
 
 const client = new Client({
   intents: [

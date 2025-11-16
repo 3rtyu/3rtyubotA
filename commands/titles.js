@@ -7,7 +7,7 @@ module.exports = {
     .setName('titles')
     .setDescription('交換可能な称号一覧を表示します'),
   async execute(interaction) {
-    const titlesPath = path.join(__dirname, '../data/titles.json'); // ✅ data フォルダを明示
+    const titlesPath = path.join(__dirname, '../data/titles.json');
 
     let titles = {};
     try {

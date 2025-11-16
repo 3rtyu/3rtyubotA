@@ -1,5 +1,5 @@
-// utils/currency.js
-const Currency = require('../models/Currency');
+// currencyManager.js
+const Currency = require('./models/Currency');
 
 async function getBalance(guildId, userId) {
   const entry = await Currency.findOne({ guildId, userId });
