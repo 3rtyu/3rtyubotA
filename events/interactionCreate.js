@@ -3,12 +3,15 @@ const {
   MessageFlags
 } = require('discord.js');
 const { pullMany, colorMap, roleNames } = require('../utils/gacha');
-const shopButtons = require('../interactions/shopButtons'); // ✅ ショップ処理を分離
+const shopButtons = require('../interactions/shopButtons');
 
 module.exports = {
   name: 'interactionCreate',
   async execute(interaction) {
-    if (!interaction.isButton()) return;
+    if (!interaction.isButton()) {
+      console.debug('非ボタンインタラクションを無視しました');
+      return;
+    }
 
     const userId = interaction.user.id;
 
@@ -59,17 +62,17 @@ module.exports = {
             try {
               await interaction.member.roles.add(role);
             } catch (err) {
-              console.error('ロール付与エラー:', err);
+              console.warn('ロール付与エラー:', err);
             }
           }
         }
       } catch (err) {
         console.error('ガチャ処理エラー:', err);
         try {
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: 'ガチャ処理中にエラーが発生しました。', ephemeral: true });
-          } else {
+          if (!interaction.replied) {
             await interaction.editReply({ content: 'ガチャ処理中にエラーが発生しました。' });
+          } else {
+            console.warn('ガチャ応答済みのため、再応答をスキップしました');
           }
         } catch (e) {
           console.error('ガチャエラー応答に失敗:', e);
@@ -78,17 +81,17 @@ module.exports = {
       return;
     }
 
-    // 🏪 ショップ購入処理（分離）
+    // 🏪 ショップ購入処理
     if (interaction.customId.startsWith('buy_')) {
       try {
-        await shopButtons(interaction); // ✅ shopButtons.js に委譲
+        await shopButtons(interaction);
       } catch (err) {
         console.error('shopButtons 呼び出しエラー:', err);
         try {
-          if (!interaction.replied && !interaction.deferred) {
-            await interaction.reply({ content: '購入処理中にエラーが発生しました。', ephemeral: true });
-          } else {
+          if (!interaction.replied) {
             await interaction.editReply({ content: '購入処理中にエラーが発生しました。' });
+          } else {
+            console.warn('ショップ応答済みのため、再応答をスキップしました');
           }
         } catch (e) {
           console.error('ショップエラー応答に失敗:', e);
