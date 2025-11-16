@@ -3,7 +3,7 @@ const {
   MessageFlags
 } = require('discord.js');
 const { pullMany, colorMap, roleNames } = require('../utils/gacha');
-const shopButtons = require('../buttons/shopButtons'); // ✅ ショップ処理を分離
+const shopButtons = require('../interactions/shopButtons'); // ✅ ショップ処理を分離
 const { getBalance, addBalance } = require('../utils/currency');
 
 module.exports = {
