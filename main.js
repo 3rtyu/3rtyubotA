@@ -1,3 +1,6 @@
+// Node.js バージョン確認用ログ
+console.log("Running Node.js version:", process.version);
+
 const { Client, Collection, Events, GatewayIntentBits, MessageFlags } = require('discord.js');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -64,7 +67,6 @@ client.on(Events.InteractionCreate, async interaction => {
       }
       await command.execute(interaction);
     }
-    // ✅ ボタン処理は interactionCreate.js に任せるため削除済み
   } catch (error) {
     console.error('Interaction handler error:', error);
     try {
@@ -89,13 +91,12 @@ client.on(Events.InteractionCreate, async interaction => {
 process.on('unhandledRejection', (reason, promise) => {
   console.error('Unhandled Rejection:', reason);
 
-  // 致命的エラー判定
   const fatalPatterns = [
-    'ECONNREFUSED', // 接続拒否
-    'EADDRINUSE',   // ポート競合
-    'RangeError: Maximum call stack size exceeded', // スタックオーバーフロー
-    'SyntaxError',  // コード構文エラー
-    'DiscordAPIError: Missing Access' // Discord権限エラー
+    'ECONNREFUSED',
+    'EADDRINUSE',
+    'RangeError: Maximum call stack size exceeded',
+    'SyntaxError',
+    'DiscordAPIError: Missing Access'
   ];
 
   const isFatal = fatalPatterns.some(pattern =>
@@ -104,7 +105,7 @@ process.on('unhandledRejection', (reason, promise) => {
 
   if (isFatal) {
     console.error('致命的なエラーのため、プロセスを終了します');
-    process.exit(1); // Renderなどの環境では自動再起動される
+    process.exit(1);
   } else {
     console.warn('非致命的なエラー。Botは継続します');
   }
