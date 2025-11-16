@@ -9,14 +9,26 @@ module.exports = {
     const userId = newState.member?.user?.id || oldState.member?.user?.id;
     if (!userId) return;
 
+    const oldChannel = oldState.channelId;
+    const newChannel = newState.channelId;
+
+    // AFKに移動した場合は記録を削除（最優先）
+    if (newChannel === AFK_CHANNEL_ID) {
+      joinTimes.delete(userId);
+      console.log(`${userId} が AFK に移動しました`);
+      return;
+    }
+
     // 通話に参加（AFK以外）
-    if (!oldState.channelId && newState.channelId && newState.channelId !== AFK_CHANNEL_ID) {
+    if (!oldChannel && newChannel) {
       joinTimes.set(userId, Date.now());
       console.log(`${userId} が通話に参加しました`);
+      return;
     }
 
     // 通話から退出
-    if (oldState.channelId && !newState.channelId) {
+    if (oldChannel && !newChannel) {
+      console.log(`${userId} が通話から退出しました`);
       const joinTime = joinTimes.get(userId);
       if (joinTime) {
         const durationMs = Date.now() - joinTime;
@@ -29,13 +41,10 @@ module.exports = {
         }
 
         joinTimes.delete(userId);
+      } else {
+        console.log(`[DEBUG] joinTimes に記録がないため、はっぱ獲得なし: ${userId}`);
       }
-    }
-
-    // AFKチャンネルに移動した場合は記録を削除
-    if (newState.channelId === AFK_CHANNEL_ID) {
-      joinTimes.delete(userId);
-      console.log(`${userId} が AFK に移動しました`);
+      return;
     }
   }
 };
