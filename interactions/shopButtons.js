@@ -1,11 +1,12 @@
 const { getBalance, addBalance } = require('../utils/currency');
 const fs = require('fs');
 const path = require('path');
-const { MessageFlags } = require('discord.js');
 
 const titlesPath = path.join(__dirname, '../data/titles.json');
 
 module.exports = async (interaction) => {
+  if (!interaction.isButton()) return;
+
   try {
     // ✅ 応答予約（3秒制限を回避）
     await interaction.deferReply({ ephemeral: true });

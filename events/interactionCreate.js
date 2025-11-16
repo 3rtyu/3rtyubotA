@@ -3,12 +3,8 @@ const {
   MessageFlags
 } = require('discord.js');
 const { pullMany, colorMap, roleNames } = require('../utils/gacha');
+const shopButtons = require('../buttons/shopButtons'); // ✅ ショップ処理を分離
 const { getBalance, addBalance } = require('../utils/currency');
-const fs = require('fs');
-const path = require('path');
-
-const titlesPath = path.join(__dirname, '../data/titles.json');
-const titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
 
 module.exports = {
   name: 'interactionCreate',
@@ -71,41 +67,9 @@ module.exports = {
       return;
     }
 
-    // 🏪 ショップ購入処理
+    // 🏪 ショップ購入処理（分離）
     if (interaction.customId.startsWith('buy_')) {
-      const key = interaction.customId.replace('buy_', '');
-      const item = titles[key];
-
-      if (!item) {
-        return interaction.reply({
-          content: 'そのアイテムは存在しません。',
-          flags: MessageFlags.Ephemeral
-        });
-      }
-
-      const balance = getBalance(userId);
-      if (balance < item.cost) {
-        return interaction.reply({
-          content: `はっぱが足りません（必要: ${item.cost}）`,
-          flags: MessageFlags.Ephemeral
-        });
-      }
-
-      addBalance(userId, -item.cost);
-      await interaction.reply({
-        content: `🎖️ ${item.role} を購入しました！（-${item.cost} はっぱ）`,
-        flags: MessageFlags.Ephemeral
-      });
-
-      const role = interaction.guild.roles.cache.find(r => r.name === item.role);
-      if (role && !interaction.member.roles.cache.has(role.id)) {
-        try {
-          await interaction.member.roles.add(role);
-        } catch (err) {
-          console.error('称号ロール付与エラー:', err);
-        }
-      }
-
+      await shopButtons(interaction); // ✅ shopButtons.js に委譲
       return;
     }
   }
