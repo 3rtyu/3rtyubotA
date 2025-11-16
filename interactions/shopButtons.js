@@ -7,64 +7,52 @@ const titlesPath = path.join(__dirname, '../data/titles.json');
 
 module.exports = async (interaction) => {
   try {
+    // ✅ 応答予約（3秒制限を回避）
+    await interaction.deferReply({ ephemeral: true });
+
+    // ✅ 称号データの読み込み
     const titles = JSON.parse(fs.readFileSync(titlesPath, 'utf8'));
     const key = interaction.customId.replace('buy_', '');
     const item = titles[key];
 
     if (!item) {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: '指定された称号が見つかりません。',
-          flags: MessageFlags.Ephemeral
-        });
-      }
+      await interaction.editReply({ content: '指定された称号が見つかりません。' });
       return;
     }
 
+    // ✅ 残高チェック
     const userId = interaction.user.id;
     const balance = getBalance(userId);
 
     if (balance < item.cost) {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: `残高不足です！${item.role} を購入するには ${item.cost} はっぱが必要です。`,
-          flags: MessageFlags.Ephemeral
-        });
-      }
+      await interaction.editReply({
+        content: `残高不足です！${item.role} を購入するには ${item.cost} はっぱが必要です。`
+      });
       return;
     }
 
+    // ✅ 通貨減算
     addBalance(userId, -item.cost);
 
+    // ✅ ロール付与
     const role = interaction.guild.roles.cache.find(r => r.name === item.role);
     if (role) {
       await interaction.member.roles.add(role);
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: `${interaction.user.username} が ${item.role} を購入しました！`,
-          flags: MessageFlags.Ephemeral
-        });
-      }
+      await interaction.editReply({
+        content: `${interaction.user.username} が ${item.role} を購入しました！`
+      });
     } else {
-      if (!interaction.replied && !interaction.deferred) {
-        await interaction.reply({
-          content: 'ロールが見つかりません。管理者に確認してください。',
-          flags: MessageFlags.Ephemeral
-        });
-      }
+      await interaction.editReply({
+        content: 'ロールが見つかりません。管理者に確認してください。'
+      });
     }
 
   } catch (err) {
     console.error('shopButtons.js エラー:', err);
-    if (!interaction.replied && !interaction.deferred) {
-      try {
-        await interaction.reply({
-          content: '内部エラーが発生しました。',
-          flags: MessageFlags.Ephemeral
-        });
-      } catch (e) {
-        console.error('エラー応答に失敗:', e);
-      }
+    try {
+      await interaction.editReply({ content: '内部エラーが発生しました。' });
+    } catch (e) {
+      console.error('エラー応答に失敗:', e);
     }
   }
 };
