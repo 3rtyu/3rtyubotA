@@ -1,4 +1,3 @@
-// events/voiceStateUpdate.js
 const { addBalance } = require('../utils/currency');
 const AFK_CHANNEL_ID = '1425141446679461980'; // AFKチャンネルID
 const joinTimes = new Map();
@@ -14,10 +13,26 @@ module.exports = {
     const oldChannel = oldState.channelId;
     const newChannel = newState.channelId;
 
-    // AFKに移動した場合は記録を削除
+    // ✅ AFKに移動した場合も、通話時間を加算してから記録を削除
     if (newChannel === AFK_CHANNEL_ID) {
-      joinTimes.delete(userId);
       console.log(`${userId} が AFK に移動しました`);
+      const joinTime = joinTimes.get(userId);
+      if (joinTime) {
+        const durationMs = Date.now() - joinTime;
+        const durationMinutes = Math.floor(durationMs / 60000);
+        const earned = durationMinutes;
+
+        if (earned > 0) {
+          try {
+            await addBalance(guildId, userId, earned);
+            console.log(`${userId} が AFK移動前に ${earned} はっぱを獲得しました！`);
+          } catch (err) {
+            console.error(`AFK移動時のはっぱ加算に失敗 (${userId}):`, err);
+          }
+        }
+        // AFKに入った時点で記録をリセット
+        joinTimes.delete(userId);
+      }
       return;
     }
 
