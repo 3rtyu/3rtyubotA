@@ -1,5 +1,6 @@
 const { addBalance } = require('../utils/currency');
 const AFK_CHANNEL_ID = '1425141446679461980'; // AFKチャンネルID
+const SPECIAL_CHANNEL_ID = '1441932852307562496'; // 2倍チャンネルID
 const joinTimes = new Map();
 
 module.exports = {
@@ -20,19 +21,34 @@ module.exports = {
       if (joinTime) {
         const durationMs = Date.now() - joinTime;
         const durationMinutes = Math.floor(durationMs / 60000);
-        const earned = durationMinutes;
+        const multiplier = oldChannel === SPECIAL_CHANNEL_ID ? 2 : 1;
+        const earned = durationMinutes * multiplier;
 
         if (earned > 0) {
-          try {
-            await addBalance(guildId, userId, earned);
-            console.log(`${userId} が AFK移動前に ${earned} はっぱを獲得しました！`);
-          } catch (err) {
-            console.error(`AFK移動時のはっぱ加算に失敗 (${userId}):`, err);
-          }
+          await addBalance(guildId, userId, earned);
+          console.log(`${userId} が AFK移動前に ${earned} はっぱを獲得しました！`);
         }
-        // AFKに入った時点で記録をリセット
         joinTimes.delete(userId);
       }
+      return;
+    }
+
+    // ✅ チャンネル移動（AFK以外）
+    if (oldChannel && newChannel && oldChannel !== newChannel) {
+      const joinTime = joinTimes.get(userId);
+      if (joinTime) {
+        const durationMs = Date.now() - joinTime;
+        const durationMinutes = Math.floor(durationMs / 60000);
+        const multiplier = oldChannel === SPECIAL_CHANNEL_ID ? 2 : 1;
+        const earned = durationMinutes * multiplier;
+
+        if (earned > 0) {
+          await addBalance(guildId, userId, earned);
+          console.log(`${userId} が ${oldChannel} から ${newChannel} に移動し、${earned} はっぱを獲得しました！`);
+        }
+      }
+      // 新しいチャンネルに入った時刻を記録
+      joinTimes.set(userId, Date.now());
       return;
     }
 
@@ -50,15 +66,12 @@ module.exports = {
       if (joinTime) {
         const durationMs = Date.now() - joinTime;
         const durationMinutes = Math.floor(durationMs / 60000);
-        const earned = durationMinutes;
+        const multiplier = oldChannel === SPECIAL_CHANNEL_ID ? 2 : 1;
+        const earned = durationMinutes * multiplier;
 
         if (earned > 0) {
-          try {
-            await addBalance(guildId, userId, earned);
-            console.log(`${userId} が ${earned} はっぱを獲得しました！`);
-          } catch (err) {
-            console.error(`はっぱ加算に失敗しました (${userId}):`, err);
-          }
+          await addBalance(guildId, userId, earned);
+          console.log(`${userId} が通話から退出し、${earned} はっぱを獲得しました！`);
         }
 
         joinTimes.delete(userId);
