@@ -55,13 +55,11 @@ module.exports = {
     // 通話に参加（AFK以外）
     if (!oldChannel && newChannel) {
       joinTimes.set(userId, Date.now());
-      console.log(`${userId} が通話に参加しました`);
       return;
     }
 
     // 通話から退出
     if (oldChannel && !newChannel) {
-      console.log(`${userId} が通話から退出しました`);
       const joinTime = joinTimes.get(userId);
       if (joinTime) {
         const durationMs = Date.now() - joinTime;
