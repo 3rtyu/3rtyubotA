@@ -1,0 +1,62 @@
+// commands/deployGacha.js
+const {
+  SlashCommandBuilder,
+  PermissionFlagsBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  EmbedBuilder,
+  MessageFlags
+} = require('discord.js');
+
+module.exports = {
+  data: new SlashCommandBuilder()
+    .setName('deploy-gacha')
+    .setDescription('ガチャボタン付きメッセージを設置します（管理者専用）')
+    .setDefaultMemberPermissions(PermissionFlagsBits.ManageGuild),
+
+  async execute(interaction) { // ✅ client を削除して interaction のみ
+    // 1連/10連ボタン
+    const row = new ActionRowBuilder().addComponents(
+      new ButtonBuilder()
+        .setCustomId('gacha_one')
+        .setLabel('1連引く')
+        .setStyle(ButtonStyle.Primary),
+      new ButtonBuilder()
+        .setCustomId('gacha_ten')
+        .setLabel('10連引く')
+        .setStyle(ButtonStyle.Success)
+    );
+
+    // Embed で排出率を「中央寄せ」っぽく表示
+    const embed = new EmbedBuilder()
+      .setTitle('**プロセカ(?)ガチャ！**')
+      .addFields(
+        { name: '\u200B', value: '\u200B', inline: true },
+        {
+          name: '📊 排出率',
+          value: [
+            '⭐️: 59.99%',
+            '⭐⭐: 30%',
+            '⭐⭐⭐: 7%',
+            '⭐⭐⭐⭐: 3%',
+          ].join('\n'),
+          inline: true
+        },
+        { name: '\u200B', value: '\u200B', inline: true }
+      )
+      .setColor(0x00AE86);
+
+    // 管理者への確認レスポンス（ephemeral）
+    await interaction.reply({
+      content: 'ガチャボタンを設置しました！',
+      flags: MessageFlags.Ephemeral // ✅ v14 では flags を推奨
+    });
+
+    // 実際のガチャメッセージをチャンネルに送信
+    await interaction.channel.send({
+      embeds: [embed],
+      components: [row]
+    });
+  }
+};
