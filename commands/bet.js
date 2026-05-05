@@ -26,14 +26,10 @@ module.exports = {
             .setRequired(true)))
     .addSubcommand(sub =>
       sub.setName('close')
-        .setDescription('賭けを締め切ります（作成者のみ）')
+        .setDescription('賭けを締め切り、勝者選択メニューを表示します')
         .addStringOption(opt =>
           opt.setName('bet_id')
             .setDescription('締め切る賭けのID')
-            .setRequired(true))
-        .addStringOption(opt =>
-          opt.setName('winner')
-            .setDescription('勝者（yes/no）')
             .setRequired(true)))
     .addSubcommand(sub =>
       sub.setName('list')
@@ -94,35 +90,58 @@ module.exports = {
       return interaction.reply('賭けに参加しました！');
     }
 
-    // -------------------------
-    // CLOSE
-    // -------------------------
-    if (sub === 'close') {
-      const betId = interaction.options.getString('bet_id');
-      const winner = interaction.options.getString('winner');
-      const bet = await Bet.findById(betId);
+// -------------------------
+// CLOSE（勝者選択メニューを表示）
+// -------------------------
+if (sub === 'close') {
+  const betId = interaction.options.getString('bet_id');
+  const bet = await Bet.findById(betId);
 
-      if (!bet) return interaction.reply('その賭けは存在しません。');
-      if (bet.guildId !== guildId) return interaction.reply('このサーバーの賭けではありません。');
-      if (bet.creatorId !== interaction.user.id) {
-        return interaction.reply('賭けを締め切れるのは作成者のみです。');
-      }
+  if (!bet) return interaction.reply('その賭けは存在しません。');
+  if (bet.guildId !== guildId) return interaction.reply('このサーバーの賭けではありません。');
+  if (bet.creatorId !== interaction.user.id) {
+    return interaction.reply('賭けを締め切れるのは作成者のみです。');
+  }
+  if (bet.isClosed) return interaction.reply('この賭けはすでに締め切られています。');
 
-      bet.isClosed = true;
-      bet.winner = winner;
-      await bet.save();
-
-      // 報酬計算
-      const reward = bet.amount * bet.participants.length;
-
-      if (winner === 'yes') {
-        for (const userId of bet.participants) {
-          await currencyManager.addBalance(guildId, userId, reward);
-        }
-      }
-
-      return interaction.reply('賭けを締め切りました！');
+  // 参加者のユーザー名を取得
+  const options = [];
+  for (const userId of bet.participants) {
+    try {
+      const member = await interaction.guild.members.fetch(userId);
+      options.push({
+        label: member.displayName, // ← ここがユーザー名
+        value: userId
+      });
+    } catch (e) {
+      // 取得できなかった場合はIDで代用
+      options.push({
+        label: `ユーザーID: ${userId}`,
+        value: userId
+      });
     }
+  }
+
+  const row = {
+    type: 1,
+    components: [
+      {
+        type: 3,
+        custom_id: `bet_winner_select_${bet._id}`,
+        placeholder: '勝者を選択（複数選択可）',
+        min_values: 1,
+        max_values: bet.participants.length,
+        options
+      }
+    ]
+  };
+
+  return interaction.reply({
+    content: '勝者を選んでください。',
+    components: [row]
+  });
+}
+
 
     // -------------------------
     // LIST
